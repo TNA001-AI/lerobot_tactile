@@ -143,6 +143,15 @@ class RealSenseCamera(Camera):
             if self.rotation in [cv2.ROTATE_90_CLOCKWISE, cv2.ROTATE_90_COUNTERCLOCKWISE]:
                 self.capture_width, self.capture_height = self.height, self.width
 
+        # Target dimensions for software resizing
+        self.target_width = config.target_width
+        self.target_height = config.target_height
+
+        # Update output dimensions to target if specified (for dataset features)
+        if self.target_width and self.target_height:
+            self.width = self.target_width
+            self.height = self.target_height
+
     def __str__(self) -> str:
         return f"{self.__class__.__name__}({self.serial_number})"
 
@@ -445,6 +454,20 @@ class RealSenseCamera(Camera):
 
         if self.rotation in [cv2.ROTATE_90_CLOCKWISE, cv2.ROTATE_90_COUNTERCLOCKWISE, cv2.ROTATE_180]:
             processed_image = cv2.rotate(processed_image, self.rotation)
+
+        # Apply software resize if target dimensions are specified
+        if self.target_width and self.target_height:
+            if depth_frame:
+                current_h, current_w = processed_image.shape
+            else:
+                current_h, current_w = processed_image.shape[:2]
+
+            if self.target_width != current_w or self.target_height != current_h:
+                processed_image = cv2.resize(
+                    processed_image,
+                    (self.target_width, self.target_height),
+                    interpolation=cv2.INTER_AREA  # Best for downsampling
+                )
 
         return processed_image
 

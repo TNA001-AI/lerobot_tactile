@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright 2025 The HuggingFace Inc. team. All rights reserved.
+# Copyright 2024 The HuggingFace Inc. team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,10 +13,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""SO100 follower robot with tactile sensor support"""
 
-from .config import RobotConfig
-from .robot import Robot
-from .utils import make_robot_from_config
+from lerobot.robots.so100_tactile_follower.config_so100_tactile_follower import SO100TactileFollowerConfig
+from lerobot.robots.so100_tactile_follower.so100_tactile_follower import SO100TactileFollower
 
-# Import tactile-enabled robot for registration
-from .so100_tactile_follower import SO100TactileFollower, SO100TactileFollowerConfig
+__all__ = ["SO100TactileFollowerConfig", "SO100TactileFollower"]

@@ -100,6 +100,7 @@ class ACTConfig(PreTrainedConfig):
             "VISUAL": NormalizationMode.MEAN_STD,
             "STATE": NormalizationMode.MEAN_STD,
             "ACTION": NormalizationMode.MEAN_STD,
+            "TACTILE": NormalizationMode.MEAN_STD,
         }
     )
 
@@ -127,6 +128,14 @@ class ACTConfig(PreTrainedConfig):
     # Inference.
     # Note: the value used in ACT when temporal ensembling is enabled is 0.01.
     temporal_ensemble_coeff: float | None = None
+
+    # Tactile sensor configuration
+    use_tactile: bool = True
+    tactile_encoder_type: str = "cnn"  # choices: ["cnn", "attention"]
+    tactile_input_shape: tuple[int, int] = (16, 32)
+    tactile_dropout: float = 0.3
+    # Multiple tactile sensors support
+    tactile_features: list[str] | None = None  # e.g., ["observation.tactile.left", "observation.tactile.right"]
 
     # Training and loss computation.
     dropout: float = 0.1
@@ -159,6 +168,11 @@ class ACTConfig(PreTrainedConfig):
             raise ValueError(
                 f"Multiple observation steps not handled yet. Got `nobs_steps={self.n_obs_steps}`"
             )
+        if self.use_tactile and self.tactile_encoder_type not in ["cnn", "attention"]:
+            raise ValueError(
+                f"Invalid tactile encoder type. Got {self.tactile_encoder_type}, "
+                f"expected one of ['cnn', 'attention']"
+            )
 
     def get_optimizer_preset(self) -> AdamWConfig:
         return AdamWConfig(
@@ -170,8 +184,8 @@ class ACTConfig(PreTrainedConfig):
         return None
 
     def validate_features(self) -> None:
-        if not self.image_features and not self.env_state_feature:
-            raise ValueError("You must provide at least one image or the environment state among the inputs.")
+        if not self.image_features and not self.env_state_feature and not self.use_tactile:
+            raise ValueError("You must provide at least one of: images, environment state, or tactile sensor among the inputs.")
 
     @property
     def observation_delta_indices(self) -> None:

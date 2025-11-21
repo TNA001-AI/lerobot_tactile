@@ -1,0 +1,41 @@
+lerobot-teleoperate     --robot.type=so100_tactile_follower     --robot.port=/dev/ttyACM0     --robot.id=follower     --teleop.type=so100_leader     --teleop.port=/dev/ttyACM1     --teleop.id=leader     --display_data=true --robot.cameras='{ top: {"type": "intelrealsense", "serial_number_or_name":"239222300740",  "width": 640, "height": 480, "target_width":224, "target_height":224, "fps": 30}}'
+
+
+lerobot-record \
+    --robot.type=so100_tactile_follower \
+    --robot.port=/dev/ttyACM0 \
+    --robot.id=follower \
+    --robot.cameras='{ top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
+    --teleop.type=so100_leader \
+    --teleop.port=/dev/ttyACM1 \
+    --teleop.id=leader \
+    --display_data=true \
+    --dataset.repo_id=Tna001/tactile1 \
+    --dataset.num_episodes=3 \
+    --dataset.episode_time_s=20 \
+    --dataset.reset_time_s=3 \
+    --dataset.single_task="pick and place" \
+    --dataset.push_to_hub=False
+    
+    
+lerobot-train \
+  --dataset.repo_id=Tna001/tactile1 \
+  --policy.type=act \
+  --output_dir=outputs/train/tactile_act_policy \
+  --job_name=tactile_act \
+  --policy.device=cuda \
+  --wandb.enable=true \
+  --policy.repo_id=Tna001/act_policy1
+  
+  
+  lerobot-record \
+      --robot.type=so100_tactile_follower \
+      --robot.port=/dev/ttyACM0 \
+      --robot.id=follower \
+      --robot.cameras='{ top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
+      --display_data=true \
+      --dataset.repo_id=Tna001/eval_tactile3 \
+      --dataset.num_episodes=10 \
+      --dataset.episode_time_s=3000 \
+      --dataset.single_task="pick and place" \
+      --policy.path=/home/yolandazhu/lerobot_tactile/outputs/train/tactile_act_policy/checkpoints/last/pretrained_model

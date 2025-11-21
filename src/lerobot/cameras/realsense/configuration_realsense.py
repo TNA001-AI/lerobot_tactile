@@ -45,6 +45,8 @@ class RealSenseCameraConfig(CameraConfig):
         use_depth: Whether to enable depth stream. Defaults to False.
         rotation: Image rotation setting (0°, 90°, 180°, or 270°). Defaults to no rotation.
         warmup_s: Time reading frames before returning from connect (in seconds)
+        target_width: Target width for software resizing. If None, uses capture width.
+        target_height: Target height for software resizing. If None, uses capture height.
 
     Note:
         - Either name or serial_number must be specified.
@@ -58,6 +60,8 @@ class RealSenseCameraConfig(CameraConfig):
     use_depth: bool = False
     rotation: Cv2Rotation = Cv2Rotation.NO_ROTATION
     warmup_s: int = 1
+    target_width: int | None = 224
+    target_height: int | None = 224
 
     def __post_init__(self) -> None:
         if self.color_mode not in (ColorMode.RGB, ColorMode.BGR):

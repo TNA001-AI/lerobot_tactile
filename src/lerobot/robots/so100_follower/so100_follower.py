@@ -67,7 +67,7 @@ class SO100Follower(Robot):
     @property
     def _cameras_ft(self) -> dict[str, tuple]:
         return {
-            cam: (self.config.cameras[cam].height, self.config.cameras[cam].width, 3) for cam in self.cameras
+            cam: (self.cameras[cam].height, self.cameras[cam].width, 3) for cam in self.cameras
         }
 
     @cached_property

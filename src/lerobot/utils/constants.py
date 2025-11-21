@@ -26,6 +26,8 @@ OBS_IMAGES = OBS_IMAGE + "s"
 OBS_LANGUAGE = OBS_STR + ".language"
 OBS_LANGUAGE_TOKENS = OBS_LANGUAGE + ".tokens"
 OBS_LANGUAGE_ATTENTION_MASK = OBS_LANGUAGE + ".attention_mask"
+OBS_TACTILE = OBS_STR + ".tactile"
+OBS_TACTILES = OBS_TACTILE + "s"
 
 ACTION = "action"
 REWARD = "next.reward"

@@ -35,7 +35,138 @@ from torchvision.ops.misc import FrozenBatchNorm2d
 
 from lerobot.policies.act.configuration_act import ACTConfig
 from lerobot.policies.pretrained import PreTrainedPolicy
-from lerobot.utils.constants import ACTION, OBS_ENV_STATE, OBS_IMAGES, OBS_STATE
+from lerobot.utils.constants import ACTION, OBS_ENV_STATE, OBS_IMAGES, OBS_STATE, OBS_TACTILE, OBS_TACTILES
+
+
+class TactileCNN(nn.Module):
+    """Tactile CNN encoder for ACT policy"""
+
+    def __init__(self, input_shape=(16, 32), feature_dim=256, dropout=0.3):
+        """
+        Args:
+            input_shape: tuple (height, width) of tactile sensor
+            feature_dim: output feature dimension for transformer
+            dropout: dropout probability
+        """
+        super(TactileCNN, self).__init__()
+
+        self.input_shape = input_shape
+        self.feature_dim = feature_dim
+
+        # Convolutional layers
+        self.conv1 = nn.Conv2d(1, 32, kernel_size=3, padding=1)
+        self.bn1 = nn.BatchNorm2d(32)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
+        self.bn2 = nn.BatchNorm2d(64)
+        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
+        self.bn3 = nn.BatchNorm2d(128)
+
+        self.pool = nn.MaxPool2d(2, 2)
+        self.dropout = nn.Dropout(dropout)
+
+        # Calculate the size after convolutions and pooling
+        # After 3 pooling layers: H/8 x W/8
+        feature_h = input_shape[0] // 8
+        feature_w = input_shape[1] // 8
+        conv_output_dim = 128 * feature_h * feature_w
+
+        # Fully connected layers to get desired feature dimension
+        self.fc1 = nn.Linear(conv_output_dim, 512)
+        self.fc2 = nn.Linear(512, feature_dim)
+
+    def forward(self, x):
+        # Add channel dimension if not present
+        if x.dim() == 3:
+            x = x.unsqueeze(1)  # (B, H, W) -> (B, 1, H, W)
+
+        # Convolutional layers
+        x = self.pool(F.relu(self.bn1(self.conv1(x))))
+        x = self.pool(F.relu(self.bn2(self.conv2(x))))
+        x = self.pool(F.relu(self.bn3(self.conv3(x))))
+
+        # Flatten
+        x = x.view(x.size(0), -1)
+
+        # Fully connected layers
+        x = F.relu(self.fc1(x))
+        x = self.dropout(x)
+        x = self.fc2(x)
+
+        return x
+
+
+class TactileAttentionCNN(nn.Module):
+    """Tactile Attention CNN encoder for ACT policy"""
+
+    def __init__(self, input_shape=(16, 32), feature_dim=256, dropout=0.4):
+        """
+        Args:
+            input_shape: tuple (height, width) of tactile sensor
+            feature_dim: output feature dimension for transformer
+            dropout: dropout probability
+        """
+        super(TactileAttentionCNN, self).__init__()
+
+        self.input_shape = input_shape
+        self.feature_dim = feature_dim
+
+        # Feature extraction
+        self.conv1 = nn.Conv2d(1, 64, kernel_size=3, padding=1)
+        self.bn1 = nn.BatchNorm2d(64)
+
+        self.conv2 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
+        self.bn2 = nn.BatchNorm2d(128)
+
+        self.conv3 = nn.Conv2d(128, 256, kernel_size=3, padding=1)
+        self.bn3 = nn.BatchNorm2d(256)
+
+        self.pool = nn.MaxPool2d(2, 2)
+
+        # Spatial attention
+        self.attention = nn.Sequential(
+            nn.Conv2d(256, 128, kernel_size=1),
+            nn.ReLU(),
+            nn.Conv2d(128, 1, kernel_size=1),
+            nn.Sigmoid()
+        )
+
+        # Global pooling
+        self.global_avg_pool = nn.AdaptiveAvgPool2d((1, 1))
+        self.global_max_pool = nn.AdaptiveMaxPool2d((1, 1))
+
+        # Feature projection to desired dimension
+        self.fc = nn.Sequential(
+            nn.Linear(512, 512),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(512, feature_dim)
+        )
+
+    def forward(self, x):
+        if x.dim() == 3:
+            x = x.unsqueeze(1)
+
+        # Feature extraction
+        x = self.pool(F.relu(self.bn1(self.conv1(x))))
+        x = self.pool(F.relu(self.bn2(self.conv2(x))))
+        x = self.pool(F.relu(self.bn3(self.conv3(x))))
+
+        # Spatial attention
+        attention_weights = self.attention(x)
+        x = x * attention_weights
+
+        # Dual pooling
+        avg_pool = self.global_avg_pool(x)
+        max_pool = self.global_max_pool(x)
+
+        # Concatenate both pooling results
+        x = torch.cat([avg_pool, max_pool], dim=1)
+        x = x.view(x.size(0), -1)
+
+        # Feature projection
+        x = self.fc(x)
+
+        return x
 
 
 class ACTPolicy(PreTrainedPolicy):
@@ -330,6 +461,23 @@ class ACT(nn.Module):
             # Note: The forward method of this returns a dict: {"feature_map": output}.
             self.backbone = IntermediateLayerGetter(backbone_model, return_layers={"layer4": "feature_map"})
 
+        # Tactile encoder for tactile feature extraction.
+        if self.config.use_tactile:
+            if config.tactile_encoder_type == "cnn":
+                self.tactile_encoder = TactileCNN(
+                    input_shape=config.tactile_input_shape,
+                    feature_dim=config.dim_model,  # Output directly to dim_model
+                    dropout=config.tactile_dropout
+                )
+            elif config.tactile_encoder_type == "attention":
+                self.tactile_encoder = TactileAttentionCNN(
+                    input_shape=config.tactile_input_shape,
+                    feature_dim=config.dim_model,  # Output directly to dim_model
+                    dropout=config.tactile_dropout
+                )
+            else:
+                raise ValueError(f"Unknown tactile encoder type: {config.tactile_encoder_type}")
+
         # Transformer (acts as VAE decoder when training with the variational objective).
         self.encoder = ACTEncoder(config)
         self.decoder = ACTDecoder(config)
@@ -344,6 +492,7 @@ class ACT(nn.Module):
             self.encoder_env_state_input_proj = nn.Linear(
                 self.config.env_state_feature.shape[0], config.dim_model
             )
+        # Remove projection layer since tactile encoder outputs dim_model directly
         self.encoder_latent_input_proj = nn.Linear(config.latent_dim, config.dim_model)
         if self.config.image_features:
             self.encoder_img_feat_input_proj = nn.Conv2d(
@@ -355,6 +504,10 @@ class ACT(nn.Module):
             n_1d_tokens += 1
         if self.config.env_state_feature:
             n_1d_tokens += 1
+        if self.config.use_tactile:
+            # Add tokens for each tactile sensor
+            n_tactile_sensors = len(self.config.tactile_features) if self.config.tactile_features else 1
+            n_1d_tokens += n_tactile_sensors
         self.encoder_1d_feature_pos_embed = nn.Embedding(n_1d_tokens, config.dim_model)
         if self.config.image_features:
             self.encoder_cam_feat_pos_embed = ACTSinusoidalPositionEmbedding2d(config.dim_model // 2)
@@ -463,6 +616,28 @@ class ACT(nn.Module):
         # Environment state token.
         if self.config.env_state_feature:
             encoder_in_tokens.append(self.encoder_env_state_input_proj(batch[OBS_ENV_STATE]))
+        # Tactile state tokens - support multiple sensors
+        # Note: position embeddings for tactile are already included in encoder_in_pos_embed
+        # Debug: print batch keys to check tactile data
+        # print("Batch keys:", list(batch.keys()))
+        # print("OBS_TACTILE:", OBS_TACTILE)
+        # print("Has tactile:", OBS_TACTILE in batch)
+        if self.config.use_tactile:
+            if self.config.tactile_features:
+                # Multiple named tactile sensors
+                for tactile_key in self.config.tactile_features:
+                    if tactile_key in batch:
+                        tactile_features = self.tactile_encoder(batch[tactile_key])
+                        encoder_in_tokens.append(tactile_features)
+            elif OBS_TACTILES in batch:
+                # Multiple tactile sensors in a list
+                for tactile_data in batch[OBS_TACTILES]:
+                    tactile_features = self.tactile_encoder(tactile_data)
+                    encoder_in_tokens.append(tactile_features)
+            elif OBS_TACTILE in batch:
+                # Single tactile sensor (backward compatibility)
+                tactile_features = self.tactile_encoder(batch[OBS_TACTILE])
+                encoder_in_tokens.append(tactile_features)
 
         if self.config.image_features:
             # For a list of images, the H and W may vary but H*W is constant.

@@ -43,7 +43,7 @@ from lerobot.datasets.backward_compatibility import (
     BackwardCompatibilityError,
     ForwardCompatibilityError,
 )
-from lerobot.utils.constants import ACTION, OBS_ENV_STATE, OBS_STR
+from lerobot.utils.constants import ACTION, OBS_ENV_STATE, OBS_STR, OBS_TACTILE, OBS_STATE
 from lerobot.utils.utils import SuppressProgressBars, is_valid_numpy_dtype_string
 
 DEFAULT_CHUNK_SIZE = 1000  # Max number of files per chunk
@@ -623,7 +623,12 @@ def hw_to_dataset_features(
     joint_fts = {
         key: ftype
         for key, ftype in hw_features.items()
-        if ftype is float or (isinstance(ftype, PolicyFeature) and ftype.type != FeatureType.VISUAL)
+        if ftype is float or (isinstance(ftype, PolicyFeature) and ftype.type not in [FeatureType.VISUAL, FeatureType.TACTILE])
+    }
+    tactile_fts = {
+        key: ftype
+        for key, ftype in hw_features.items()
+        if isinstance(ftype, PolicyFeature) and ftype.type == FeatureType.TACTILE
     }
     cam_fts = {key: shape for key, shape in hw_features.items() if isinstance(shape, tuple)}
 
@@ -639,6 +644,15 @@ def hw_to_dataset_features(
             "dtype": "float32",
             "shape": (len(joint_fts),),
             "names": list(joint_fts),
+        }
+
+    # Handle tactile features as separate 2D arrays
+    for key, ftype in tactile_fts.items():
+        # Key is simple (e.g., "tactile"), prefix is added here
+        features[f"{prefix}.{key}"] = {
+            "dtype": "float32",
+            "shape": ftype.shape,
+            "names": ["height", "width"],
         }
 
     for key, shape in cam_fts.items():
@@ -675,6 +689,14 @@ def build_dataset_frame(
             continue
         elif ft["dtype"] == "float32" and len(ft["shape"]) == 1:
             frame[key] = np.array([values[name] for name in ft["names"]], dtype=np.float32)
+        elif ft["dtype"] == "float32" and len(ft["shape"]) == 2:
+            # Handle 2D tactile data
+            tactile_key = key.removeprefix(f"{prefix}.")
+            if tactile_key in values:
+                frame[key] = values[tactile_key].astype(np.float32)
+            else:
+                # Try without prefix
+                frame[key] = values[key].astype(np.float32)
         elif ft["dtype"] in ["image", "video"]:
             frame[key] = values[key.removeprefix(f"{prefix}.images.")]
 
@@ -712,7 +734,11 @@ def dataset_to_policy_features(features: dict[str, dict]) -> dict[str, PolicyFea
                 shape = (shape[2], shape[0], shape[1])
         elif key == OBS_ENV_STATE:
             type = FeatureType.ENV
-        elif key.startswith(OBS_STR):
+        elif key.startswith(OBS_TACTILE):
+            # Tactile features (2D arrays)
+            type = FeatureType.TACTILE
+        elif key == OBS_STATE or (key.startswith(OBS_STR) and len(shape) == 1):
+            # State features (1D arrays like motor positions)
             type = FeatureType.STATE
         elif key.startswith(ACTION):
             type = FeatureType.ACTION
@@ -1039,6 +1065,8 @@ def validate_feature_dtype_and_shape(
         return validate_feature_image_or_video(name, expected_shape, value)
     elif expected_dtype == "string":
         return validate_feature_string(name, value)
+    elif expected_dtype == "tactile":
+        return validate_feature_tactile(name, value, tuple(expected_shape))
     else:
         raise NotImplementedError(f"The feature dtype '{expected_dtype}' is not implemented yet.")
 
@@ -1116,6 +1144,40 @@ def validate_feature_string(name: str, value: str) -> str:
     if not isinstance(value, str):
         return f"The feature '{name}' is expected to be of type 'str', but type '{type(value)}' provided instead.\n"
     return ""
+
+
+def validate_feature_tactile(name: str, value: np.ndarray, expected_shape: tuple[int, int]) -> str:
+    """Validate a tactile sensor feature.
+
+    Args:
+        name (str): The name of the feature.
+        value (np.ndarray): The tactile data array to validate.
+        expected_shape (tuple[int, int]): Expected shape of tactile array (H, W).
+
+    Returns:
+        str: An error message if validation fails, otherwise an empty string.
+    """
+    error_message = ""
+    
+    if not isinstance(value, np.ndarray):
+        error_message += f"The feature '{name}' is expected to be of type 'np.ndarray', but type '{type(value)}' provided instead.\n"
+        return error_message
+    
+    # Check data type
+    if value.dtype not in [np.float32, np.float64, np.int32, np.int64, np.uint8, np.uint16]:
+        error_message += f"The feature '{name}' has unsupported dtype '{value.dtype}'. Expected numeric type.\n"
+    
+    # Check shape
+    if value.ndim != 2:
+        error_message += f"The feature '{name}' is expected to have 2 dimensions (H, W), but has {value.ndim} dimensions.\n"
+    elif value.shape != expected_shape:
+        error_message += f"The feature '{name}' has shape {value.shape}, but expected {expected_shape}.\n"
+    
+    # Check value range (tactile data should be non-negative)
+    if value.min() < 0:
+        error_message += f"The feature '{name}' contains negative values. Tactile data should be non-negative.\n"
+    
+    return error_message
 
 
 def validate_episode_buffer(episode_buffer: dict, total_episodes: int, features: dict) -> None:
