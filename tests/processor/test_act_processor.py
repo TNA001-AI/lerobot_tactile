@@ -33,7 +33,8 @@ from lerobot.processor import (
     UnnormalizerProcessorStep,
 )
 from lerobot.processor.converters import create_transition, transition_to_batch
-from lerobot.utils.constants import ACTION, OBS_STATE
+from lerobot.processor.tactile_processor import TactileNormalizationProcessorStep, TactileValidationProcessorStep
+from lerobot.utils.constants import ACTION, OBS_STATE, OBS_TACTILE
 
 
 def create_default_config():
@@ -83,6 +84,33 @@ def test_make_act_processor_basic():
     assert len(postprocessor.steps) == 2
     assert isinstance(postprocessor.steps[0], UnnormalizerProcessorStep)
     assert isinstance(postprocessor.steps[1], DeviceProcessorStep)
+
+
+def test_make_act_processor_with_tactile_steps():
+    """Test ACT processor inserts tactile preprocessing steps when tactile is enabled."""
+    config = create_default_config()
+    config.use_tactile = True
+    config.tactile_input_shape = (16, 32)
+    config.input_features[OBS_TACTILE] = PolicyFeature(type=FeatureType.TACTILE, shape=(16, 32))
+    config.normalization_mapping[FeatureType.TACTILE] = NormalizationMode.MEAN_STD
+    stats = create_default_stats()
+    stats[OBS_TACTILE] = {"mean": torch.zeros(16, 32), "std": torch.ones(16, 32)}
+
+    preprocessor, _ = make_act_pre_post_processors(config, stats)
+
+    assert len(preprocessor.steps) == 6
+    assert isinstance(preprocessor.steps[1], TactileValidationProcessorStep)
+    assert isinstance(preprocessor.steps[2], TactileNormalizationProcessorStep)
+
+    observation = {OBS_STATE: torch.randn(7), OBS_TACTILE: torch.full((16, 32), 35.0)}
+    action = torch.randn(4)
+    transition = create_transition(observation, action)
+    batch = transition_to_batch(transition)
+
+    processed = preprocessor(batch)
+    assert processed[OBS_TACTILE].shape == (1, 16, 32)
+    assert torch.all(processed[OBS_TACTILE] >= 0)
+    assert torch.all(processed[OBS_TACTILE] <= 1)
 
 
 def test_act_processor_normalization():
