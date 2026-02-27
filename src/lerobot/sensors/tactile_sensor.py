@@ -23,23 +23,26 @@ from typing import Optional
 import cv2
 import numpy as np
 import serial
-from scipy.ndimage import gaussian_filter
-
 
 class TactileSensor:
     """Interface for 16x32 tactile sensor array via USB serial communication"""
+
+    # Binary protocol constants
+    MAGIC = b"\xAA\x55"
+    ROWS, COLS = 16, 32
+    FRAME_BYTES = ROWS * COLS  # 512
 
     def __init__(
         self,
         port: str = "/dev/ttyUSB0",
         baud_rate: int = 2000000,
-        timeout: float = 1.0,
+        timeout: float = 0.01,
         shape: tuple[int, int] = (16, 32),
         auto_calibrate: bool = True,
         enable_visualization: bool = True,
         window_name: str = "Tactile Sensor",
-        threshold: float = 30.0,
-        noise_scale: float = 50.0,
+        threshold: float = 25.0,
+        noise_scale: float = 30.0,
         temporal_alpha: float = 0.2,
     ):
         """
@@ -67,9 +70,9 @@ class TactileSensor:
         self.is_connected = False
         self.is_calibrated = False
 
-        # Buffer for building current frame from text lines
-        self._current_frame: list = []
-        self._last_complete_frame: Optional[np.ndarray] = None
+        # Binary protocol buffers
+        self._ring_buffer = bytearray()
+        self._frame_buffer = bytearray(self.FRAME_BYTES)
 
         # Threading for continuous data collection
         self._stop_event = threading.Event()
@@ -110,12 +113,9 @@ class TactileSensor:
                 dsrdtr=False,
             )
 
-            # Wait for connection to stabilize
-            time.sleep(0.1)
-
             # Clear any existing data in buffer
-            self.serial_conn.flushInput()
-            self.serial_conn.flushOutput()
+            self.serial_conn.flush()
+            self.serial_conn.reset_input_buffer()
 
             self.is_connected = True
             logging.info(f"Connected to tactile sensor on {self.port}")
@@ -140,49 +140,96 @@ class TactileSensor:
             self.is_connected = False
             logging.info("Disconnected from tactile sensor")
 
+    def _read_exact(self, n: int) -> Optional[bytearray]:
+        """Read exactly n bytes from serial (blocking up to timeout loops)."""
+        buf = bytearray(n)
+        mv = memoryview(buf)
+        got = 0
+        max_retries = 100
+        retries = 0
+
+        while got < n and retries < max_retries:
+            r = self.serial_conn.readinto(mv[got:])
+            if r is None:
+                r = 0
+            if r == 0:
+                retries += 1
+                time.sleep(0.001)
+                continue
+            got += r
+            retries = 0
+
+        if got < n:
+            return None
+        return buf
+
     def read_raw_data(self) -> Optional[np.ndarray]:
-        """Read raw data from sensor (ASCII text format, line by line)"""
+        """Read raw data from sensor (binary format with magic header 0xAA 0x55)"""
         if not self.is_connected or not self.serial_conn:
             logging.warning("Sensor not connected")
             return None
 
         try:
-            # Read lines until we have a complete frame
-            max_attempts = 100  # Prevent infinite loop
+            # Read chunks and search for magic header
+            max_attempts = 50
             attempts = 0
 
             while attempts < max_attempts:
-                if self.serial_conn.in_waiting > 0:
-                    try:
-                        line = self.serial_conn.readline().decode("utf-8").strip()
-                    except Exception:
-                        line = ""
+                # Read available data
+                chunk = self.serial_conn.read(4096)
+                if chunk:
+                    self._ring_buffer.extend(chunk)
 
-                    # Short line indicates end of frame
-                    if len(line) < 10:
-                        if self._current_frame is not None and len(self._current_frame) == self.shape[0]:
-                            # Complete frame received
-                            self._last_complete_frame = np.array(self._current_frame, dtype=np.float32)
-                        self._current_frame = []
+                # Keep buffer bounded
+                if len(self._ring_buffer) > 50000:
+                    self._ring_buffer = self._ring_buffer[-50000:]
 
-                        if self._last_complete_frame is not None:
-                            return self._last_complete_frame.copy()
+                # Search for magic header
+                idx = self._ring_buffer.find(self.MAGIC)
+                if idx < 0:
+                    # Keep last byte in case marker splits across chunks
+                    if len(self._ring_buffer) > 1:
+                        self._ring_buffer = self._ring_buffer[-1:]
+                    attempts += 1
+                    time.sleep(0.001)
+                    continue
+
+                # Drop bytes before marker
+                if idx > 0:
+                    del self._ring_buffer[:idx]
+
+                # Need at least magic header + frame data
+                if len(self._ring_buffer) < 2 + self.FRAME_BYTES:
+                    attempts += 1
+                    time.sleep(0.001)
+                    continue
+
+                # Consume magic header
+                del self._ring_buffer[:2]
+
+                # Extract frame bytes
+                if len(self._ring_buffer) >= self.FRAME_BYTES:
+                    self._frame_buffer[:] = self._ring_buffer[:self.FRAME_BYTES]
+                    del self._ring_buffer[:self.FRAME_BYTES]
+                else:
+                    # Need to read more data
+                    have = len(self._ring_buffer)
+                    self._frame_buffer[:have] = self._ring_buffer[:have]
+                    del self._ring_buffer[:have]
+                    rem = self.FRAME_BYTES - have
+                    rest = self._read_exact(rem)
+                    if rest is None:
+                        self._ring_buffer.clear()
+                        attempts += 1
                         continue
+                    self._frame_buffer[have:] = rest
 
-                    # Parse the line as space-separated integers
-                    if self._current_frame is not None:
-                        try:
-                            str_values = line.split()
-                            int_values = [int(val) for val in str_values]
-                            self._current_frame.append(int_values)
-                        except ValueError:
-                            # Skip malformed lines
-                            pass
+                # Convert to numpy array
+                frame = np.frombuffer(self._frame_buffer, dtype=np.uint8).reshape((self.ROWS, self.COLS)).astype(np.float32)
+                return frame
 
-                attempts += 1
-                time.sleep(0.001)  # Small delay to avoid busy waiting
-
-            return self._last_complete_frame.copy() if self._last_complete_frame is not None else None
+            logging.warning("Failed to read frame: max attempts reached")
+            return None
 
         except serial.SerialException as e:
             logging.warning(f"Serial error: {e}")
@@ -309,12 +356,12 @@ class TactileSensor:
         Normalize tactile data for visualization.
 
         Args:
-            data: Raw or processed tactile data (already baseline-subtracted)
+            data: Processed tactile data (already baseline-subtracted)
 
         Returns:
             Normalized data in range [0, 1]
         """
-        # Apply threshold (data already has baseline subtracted)
+        # Apply threshold and clip (data already has baseline subtracted)
         contact_data = data - self.threshold
         contact_data = np.clip(contact_data, 0, 100)
 
@@ -325,22 +372,10 @@ class TactileSensor:
             normalized = contact_data / self.noise_scale
         else:
             # High pressure - normalize by max value
-            normalized = contact_data / max_val
+            normalized = contact_data / (max_val + 1e-6)
 
         return np.clip(normalized, 0, 1)
 
-    def _apply_gaussian_blur(self, data: np.ndarray, sigma: float = 0.5) -> np.ndarray:
-        """
-        Apply Gaussian blur to smooth the visualization.
-
-        Args:
-            data: Input data array
-            sigma: Standard deviation for Gaussian kernel
-
-        Returns:
-            Blurred data array
-        """
-        return gaussian_filter(data, sigma=sigma)
 
     def update_visualization(self, data: Optional[np.ndarray] = None) -> bool:
         """
