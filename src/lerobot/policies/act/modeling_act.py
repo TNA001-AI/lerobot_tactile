@@ -35,7 +35,7 @@ from torchvision.ops.misc import FrozenBatchNorm2d
 
 from lerobot.policies.act.configuration_act import ACTConfig
 from lerobot.policies.pretrained import PreTrainedPolicy
-from lerobot.utils.constants import ACTION, OBS_ENV_STATE, OBS_IMAGES, OBS_STATE, OBS_TACTILE, OBS_TACTILES
+from lerobot.utils.constants import ACTION, OBS_ENV_STATE, OBS_IMAGES, OBS_STATE, OBS_TACTILE
 
 
 class TactileCNN(nn.Module):
@@ -506,9 +506,7 @@ class ACT(nn.Module):
         if self.config.env_state_feature:
             n_1d_tokens += 1
         if self.config.use_tactile:
-            # Add tokens for each tactile sensor
-            n_tactile_sensors = len(self.config.tactile_features) if self.config.tactile_features else 1
-            n_1d_tokens += n_tactile_sensors
+            n_1d_tokens += len(self.config.tactile_features) if self.config.tactile_features else 1
         self.encoder_1d_feature_pos_embed = nn.Embedding(n_1d_tokens, config.dim_model)
         if self.config.image_features:
             self.encoder_cam_feat_pos_embed = ACTSinusoidalPositionEmbedding2d(config.dim_model // 2)
@@ -617,28 +615,14 @@ class ACT(nn.Module):
         # Environment state token.
         if self.config.env_state_feature:
             encoder_in_tokens.append(self.encoder_env_state_input_proj(batch[OBS_ENV_STATE]))
-        # Tactile state tokens - support multiple sensors
-        # Note: position embeddings for tactile are already included in encoder_in_pos_embed
-        # Debug: print batch keys to check tactile data
-        # print("Batch keys:", list(batch.keys()))
-        # print("OBS_TACTILE:", OBS_TACTILE)
-        # print("Has tactile:", OBS_TACTILE in batch)
+        # Tactile token(s). Multi-sensor: iterate over tactile_features keys (must all be present).
+        # Single sensor: use OBS_TACTILE directly.
         if self.config.use_tactile:
             if self.config.tactile_features:
-                # Multiple named tactile sensors
                 for tactile_key in self.config.tactile_features:
-                    if tactile_key in batch:
-                        tactile_features = self.tactile_encoder(batch[tactile_key])
-                        encoder_in_tokens.append(tactile_features)
-            elif OBS_TACTILES in batch:
-                # Multiple tactile sensors in a list
-                for tactile_data in batch[OBS_TACTILES]:
-                    tactile_features = self.tactile_encoder(tactile_data)
-                    encoder_in_tokens.append(tactile_features)
-            elif OBS_TACTILE in batch:
-                # Single tactile sensor (backward compatibility)
-                tactile_features = self.tactile_encoder(batch[OBS_TACTILE])
-                encoder_in_tokens.append(tactile_features)
+                    encoder_in_tokens.append(self.tactile_encoder(batch[tactile_key]))
+            else:
+                encoder_in_tokens.append(self.tactile_encoder(batch[OBS_TACTILE]))
 
         if self.config.image_features:
             # For a list of images, the H and W may vary but H*W is constant.

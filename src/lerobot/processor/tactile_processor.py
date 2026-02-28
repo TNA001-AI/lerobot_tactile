@@ -39,8 +39,10 @@ class TactileNormalizationProcessorStep(ObservationProcessorStep):
         self.gaussian_sigma = gaussian_sigma
 
     def observation(self, obs: dict[str, Any]) -> dict[str, Any]:
-        if OBS_TACTILE in obs:
-            tactile_data = obs[OBS_TACTILE]
+        for key in list(obs.keys()):
+            if key != OBS_TACTILE and not key.startswith(OBS_TACTILE + "."):
+                continue
+            tactile_data = obs[key]
 
             # Convert to tensor if numpy array
             if isinstance(tactile_data, np.ndarray):
@@ -55,7 +57,7 @@ class TactileNormalizationProcessorStep(ObservationProcessorStep):
             # Ensure data is in range [0, 1]
             tactile_data = torch.clamp(tactile_data, 0, 1)
 
-            obs[OBS_TACTILE] = tactile_data
+            obs[key] = tactile_data
 
         return obs
 
@@ -77,8 +79,10 @@ class TactileValidationProcessorStep(ObservationProcessorStep):
         self.expected_shape = tuple(expected_shape)
 
     def observation(self, obs: dict[str, Any]) -> dict[str, Any]:
-        if OBS_TACTILE in obs:
-            tactile_data = obs[OBS_TACTILE]
+        for key in list(obs.keys()):
+            if key != OBS_TACTILE and not key.startswith(OBS_TACTILE + "."):
+                continue
+            tactile_data = obs[key]
 
             # Convert to tensor if needed
             if isinstance(tactile_data, np.ndarray):
@@ -99,11 +103,11 @@ class TactileValidationProcessorStep(ObservationProcessorStep):
             actual_shape = tuple(tactile_data.shape[-2:])
             if actual_shape != self.expected_shape:
                 raise ValueError(
-                    f"Tactile data shape mismatch. Expected {self.expected_shape}, "
+                    f"Tactile data shape mismatch for '{key}'. Expected {self.expected_shape}, "
                     f"got {actual_shape}"
                 )
 
-            obs[OBS_TACTILE] = tactile_data
+            obs[key] = tactile_data
 
         return obs
 
@@ -124,24 +128,25 @@ class TactileTemporalFilterProcessorStep(ObservationProcessorStep):
                   Lower values = more smoothing
         """
         self.alpha = alpha
-        self.prev_tactile = None
+        self._prev_tactile: dict[str, torch.Tensor] = {}
 
     def observation(self, obs: dict[str, Any]) -> dict[str, Any]:
-        if OBS_TACTILE in obs:
-            tactile_data = obs[OBS_TACTILE]
+        for key in list(obs.keys()):
+            if key != OBS_TACTILE and not key.startswith(OBS_TACTILE + "."):
+                continue
+            tactile_data = obs[key]
 
             if isinstance(tactile_data, np.ndarray):
                 tactile_data = torch.from_numpy(tactile_data).float()
 
             # Apply temporal filtering
-            if self.prev_tactile is not None:
-                # Exponential moving average: new = alpha * current + (1-alpha) * previous
-                tactile_data = self.alpha * tactile_data + (1 - self.alpha) * self.prev_tactile
+            if key in self._prev_tactile:
+                tactile_data = self.alpha * tactile_data + (1 - self.alpha) * self._prev_tactile[key]
 
             # Store current values for next iteration
-            self.prev_tactile = tactile_data.clone().detach()
+            self._prev_tactile[key] = tactile_data.clone().detach()
 
-            obs[OBS_TACTILE] = tactile_data
+            obs[key] = tactile_data
 
         return obs
 
@@ -153,4 +158,4 @@ class TactileTemporalFilterProcessorStep(ObservationProcessorStep):
 
     def reset(self):
         """Reset temporal filter state"""
-        self.prev_tactile = None
+        self._prev_tactile.clear()

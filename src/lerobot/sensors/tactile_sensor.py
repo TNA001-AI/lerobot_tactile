@@ -315,9 +315,6 @@ class TactileSensor:
             if data is not None:
                 with self._data_lock:
                     self._latest_data = data.copy()
-                # Update visualization if enabled
-                if self.enable_visualization:
-                    self.update_visualization(data)
             time.sleep(0.01)  # 100 Hz reading rate
 
     def get_latest_data(self) -> Optional[np.ndarray]:

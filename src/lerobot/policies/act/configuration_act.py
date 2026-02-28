@@ -125,8 +125,10 @@ class ACTConfig(PreTrainedConfig):
     tactile_encoder_type: str = "cnn"  # choices: ["cnn", "attention"]
     tactile_input_shape: tuple[int, int] = (16, 32)
     tactile_dropout: float = 0.3
-    # Multiple tactile sensors support
-    tactile_features: list[str] | None = None  # e.g., ["observation.tactile.left", "observation.tactile.right"]
+    # Named tactile sensor keys when using multiple sensors.
+    # e.g., ["observation.tactile.left", "observation.tactile.right"]
+    # Leave as None for single sensor mode (uses "observation.tactile" key).
+    tactile_features: list[str] | None = None
 
     # Training and loss computation.
     dropout: float = 0.1

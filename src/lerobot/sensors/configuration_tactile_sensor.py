@@ -13,9 +13,28 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Sensor interfaces for LeRobot"""
 
-from lerobot.sensors.configuration_tactile_sensor import TactileSensorConfig
-from lerobot.sensors.tactile_sensor import TactileSensor
+from dataclasses import dataclass
 
-__all__ = ["TactileSensor", "TactileSensorConfig"]
+
+@dataclass
+class TactileSensorConfig:
+    """Configuration for a tactile sensor connected via USB serial.
+
+    Example (single sensor)::
+
+        TactileSensorConfig(port="/dev/ttyUSB0")
+
+    Example (dual sensor in robot config)::
+
+        tactile_sensors = {
+            "left":  TactileSensorConfig(port="/dev/ttyUSB0"),
+            "right": TactileSensorConfig(port="/dev/ttyUSB1"),
+        }
+    """
+
+    port: str = "/dev/ttyUSB0"
+    baud_rate: int = 2_000_000
+    shape: tuple[int, int] = (16, 32)
+    auto_calibrate: bool = True
+    enable_visualization: bool = True

@@ -17,6 +17,7 @@
 from dataclasses import dataclass, field
 
 from lerobot.cameras import CameraConfig
+from lerobot.sensors import TactileSensorConfig
 
 from ..config import RobotConfig
 
@@ -40,21 +41,12 @@ class SO100TactileFollowerConfig(RobotConfig):
     # Set to `True` for backward compatibility with previous policies/dataset
     use_degrees: bool = False
 
-    # Tactile sensor configuration
-    tactile_enabled: bool = True
-    tactile_shape: tuple[int, int] = (16, 32)
-    tactile_auto_calibrate: bool = True
-    
-    # Multiple tactile sensors support
-    # Option 1: Dictionary of named sensors
-    tactile_sensors: dict[str, dict] = field(default_factory=lambda: {
-        # Example: Two finger sensors
-        # "left": {"port": "/dev/ttyUSB0", "baud_rate": 2000000},
-        # "right": {"port": "/dev/ttyUSB1", "baud_rate": 2000000}
-    })
-    
-    # Option 2: Simple dual sensor setup (legacy support)
-    tactile_port: str = "/dev/ttyUSB0"
-    tactile_baud_rate: int = 2000000
-    # tactile_port_2: str | None = None  # Second sensor port
-    # tactile_baud_rate_2: int = 2000000
+    # Tactile sensors. Each entry is a named sensor config.
+    # Single sensor example:
+    #   tactile_sensors = {"primary": TactileSensorConfig(port="/dev/ttyUSB0")}
+    # Dual sensor example:
+    #   tactile_sensors = {
+    #       "left":  TactileSensorConfig(port="/dev/ttyUSB0"),
+    #       "right": TactileSensorConfig(port="/dev/ttyUSB1"),
+    #   }
+    tactile_sensors: dict[str, TactileSensorConfig] = field(default_factory=dict)
