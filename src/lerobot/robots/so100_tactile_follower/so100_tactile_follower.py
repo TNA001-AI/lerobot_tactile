@@ -48,6 +48,7 @@ class SO100TactileFollower(SO100Follower):
                     enable_visualization=sensor_cfg.enable_visualization,
                 )
                 self._tactile_sensors[name] = sensor
+                sensor.start_continuous_read()
                 logging.info(f"Tactile sensor '{name}' initialized on {sensor_cfg.port}")
             except Exception as e:
                 logging.error(f"Failed to initialize tactile sensor '{name}': {e}")
@@ -60,7 +61,7 @@ class SO100TactileFollower(SO100Follower):
             obs_key = f"{OBS_TACTILE}.{name}"
             sensor_cfg = self.config.tactile_sensors[name]
             try:
-                data = sensor.read_data()
+                data = sensor.get_latest_data()
                 if data is None:
                     logging.warning(f"Failed to read tactile sensor '{name}', using zeros")
                     data = np.zeros(sensor_cfg.shape, dtype=np.float32)

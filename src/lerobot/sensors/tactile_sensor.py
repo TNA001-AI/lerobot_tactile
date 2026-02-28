@@ -18,11 +18,31 @@
 import logging
 import time
 import threading
+import multiprocessing as mp
 from typing import Optional
 
 import cv2
 import numpy as np
 import serial
+
+
+def _visualization_worker(queue: mp.Queue, window_name: str, shape: tuple):
+    """Subprocess entry point: receives colormap frames and displays via OpenCV."""
+    window_width = shape[1] * 30
+    window_height = shape[0] * 30
+    cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+    cv2.resizeWindow(window_name, window_width, window_height)
+    while True:
+        try:
+            frame = queue.get(timeout=1.0)
+        except Exception:
+            continue
+        if frame is None:
+            break
+        cv2.imshow(window_name, frame)
+        cv2.waitKey(1)
+    cv2.destroyAllWindows()
+
 
 class TactileSensor:
     """Interface for 16x32 tactile sensor array via USB serial communication"""
@@ -87,6 +107,8 @@ class TactileSensor:
         self.noise_scale = noise_scale
         self.temporal_alpha = temporal_alpha
         self._prev_frame: Optional[np.ndarray] = None
+        self._viz_queue: Optional[mp.Queue] = None
+        self._viz_process: Optional[mp.Process] = None
         self._visualization_initialized = False
 
         # Connect and calibrate
@@ -171,12 +193,9 @@ class TactileSensor:
 
         try:
             # Read chunks and search for magic header
-            max_attempts = 50
-            attempts = 0
-
-            while attempts < max_attempts:
+            while True:
                 # Read available data
-                chunk = self.serial_conn.read(4096)
+                chunk = self.serial_conn.read(8192)
                 if chunk:
                     self._ring_buffer.extend(chunk)
 
@@ -184,14 +203,13 @@ class TactileSensor:
                 if len(self._ring_buffer) > 50000:
                     self._ring_buffer = self._ring_buffer[-50000:]
 
+                # Try to parse all available frames in buffer
                 # Search for magic header
                 idx = self._ring_buffer.find(self.MAGIC)
                 if idx < 0:
                     # Keep last byte in case marker splits across chunks
                     if len(self._ring_buffer) > 1:
                         self._ring_buffer = self._ring_buffer[-1:]
-                    attempts += 1
-                    time.sleep(0.001)
                     continue
 
                 # Drop bytes before marker
@@ -200,19 +218,17 @@ class TactileSensor:
 
                 # Need at least magic header + frame data
                 if len(self._ring_buffer) < 2 + self.FRAME_BYTES:
-                    attempts += 1
-                    time.sleep(0.001)
                     continue
 
                 # Consume magic header
                 del self._ring_buffer[:2]
 
-                # Extract frame bytes
+                # Extract frame bytes (may need to read more if not enough in buffer)
                 if len(self._ring_buffer) >= self.FRAME_BYTES:
                     self._frame_buffer[:] = self._ring_buffer[:self.FRAME_BYTES]
                     del self._ring_buffer[:self.FRAME_BYTES]
                 else:
-                    # Need to read more data
+                    # Partial frame in buffer - need to read remaining bytes
                     have = len(self._ring_buffer)
                     self._frame_buffer[:have] = self._ring_buffer[:have]
                     del self._ring_buffer[:have]
@@ -220,16 +236,12 @@ class TactileSensor:
                     rest = self._read_exact(rem)
                     if rest is None:
                         self._ring_buffer.clear()
-                        attempts += 1
                         continue
                     self._frame_buffer[have:] = rest
 
-                # Convert to numpy array
+                # Convert to numpy array and return
                 frame = np.frombuffer(self._frame_buffer, dtype=np.uint8).reshape((self.ROWS, self.COLS)).astype(np.float32)
                 return frame
-
-            logging.warning("Failed to read frame: max attempts reached")
-            return None
 
         except serial.SerialException as e:
             logging.warning(f"Serial error: {e}")
@@ -269,7 +281,7 @@ class TactileSensor:
         return True
 
     def read_data(self) -> Optional[np.ndarray]:
-        """Read processed tactile data (raw - baseline)"""
+        """Read processed tactile data (raw - baseline - threshold)"""
         raw_data = self.read_raw_data()
         if raw_data is None:
             return None
@@ -278,13 +290,9 @@ class TactileSensor:
             logging.warning("Sensor not calibrated, returning raw data")
             return raw_data.astype(np.float32)
 
-        # Subtract baseline and ensure non-negative values
-        processed_data = raw_data.astype(np.float32) - self.baseline
-        processed_data = np.maximum(processed_data, 0)
-
-        # Update visualization if enabled
-        if self.enable_visualization:
-            self.update_visualization(processed_data)
+        # Subtract baseline and threshold, then clip (matching fast-32-16.py line 164)
+        processed_data = raw_data.astype(np.float32) - self.baseline - self.threshold
+        processed_data = np.clip(processed_data, 0, 100)
 
         return processed_data
 
@@ -309,13 +317,14 @@ class TactileSensor:
             logging.info("Stopped continuous tactile data reading")
 
     def _continuous_read_loop(self):
-        """Background loop for continuous data reading"""
+        """Background loop for continuous data reading and visualization"""
         while not self._stop_event.is_set():
             data = self.read_data()
             if data is not None:
                 with self._data_lock:
                     self._latest_data = data.copy()
-            time.sleep(0.01)  # 100 Hz reading rate
+                self.update_visualization(data)
+
 
     def get_latest_data(self) -> Optional[np.ndarray]:
         """Get latest data from continuous reading"""
@@ -323,14 +332,17 @@ class TactileSensor:
             return self._latest_data.copy() if self._latest_data is not None else None
 
     def _init_visualization(self):
-        """Initialize the visualization window"""
-        window_width = self.shape[1] * 30
-        window_height = self.shape[0] * 30
-        cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
-        cv2.resizeWindow(self.window_name, window_width, window_height)
+        """Launch a subprocess to display the tactile visualization window."""
+        self._viz_queue = mp.Queue(maxsize=2)
+        self._viz_process = mp.Process(
+            target=_visualization_worker,
+            args=(self._viz_queue, self.window_name, self.shape),
+            daemon=True,
+        )
+        self._viz_process.start()
         self._prev_frame = np.zeros(self.shape, dtype=np.float32)
         self._visualization_initialized = True
-        logging.info(f"Visualization window '{self.window_name}' initialized")
+        logging.info(f"Visualization process started for '{self.window_name}'")
 
     def _temporal_filter(self, new_frame: np.ndarray) -> np.ndarray:
         """
@@ -353,23 +365,18 @@ class TactileSensor:
         Normalize tactile data for visualization.
 
         Args:
-            data: Processed tactile data (already baseline-subtracted)
+            data: Processed tactile data (already baseline and threshold subtracted)
 
         Returns:
             Normalized data in range [0, 1]
         """
-        # Apply threshold and clip (data already has baseline subtracted)
-        contact_data = data - self.threshold
-        contact_data = np.clip(contact_data, 0, 100)
-
-        # Normalize based on max value
-        max_val = np.max(contact_data)
+        max_val = np.max(data)
         if max_val < self.threshold:
             # Low pressure - use noise scale normalization
-            normalized = contact_data / self.noise_scale
+            normalized = data / self.noise_scale
         else:
             # High pressure - normalize by max value
-            normalized = contact_data / (max_val + 1e-6)
+            normalized = data / (max_val + 1e-6)
 
         return np.clip(normalized, 0, 1)
 
@@ -409,18 +416,31 @@ class TactileSensor:
         # Apply color map
         colormap = cv2.applyColorMap(scaled, cv2.COLORMAP_VIRIDIS)
 
-        # Display
-        cv2.imshow(self.window_name, colormap)
-        cv2.waitKey(1)
+        # Send to visualization subprocess (non-blocking; drop frame if process is busy)
+        if self._viz_queue is not None:
+            try:
+                self._viz_queue.put_nowait(colormap)
+            except Exception:
+                pass  # Queue full — skip frame, don't block
 
         return True
 
     def close_visualization(self):
-        """Close the visualization window"""
+        """Stop the visualization subprocess."""
         if self._visualization_initialized:
-            cv2.destroyWindow(self.window_name)
+            if self._viz_queue is not None:
+                try:
+                    self._viz_queue.put_nowait(None)  # sentinel to stop worker
+                except Exception:
+                    pass
+            if self._viz_process is not None and self._viz_process.is_alive():
+                self._viz_process.join(timeout=2.0)
+                if self._viz_process.is_alive():
+                    self._viz_process.terminate()
+            self._viz_queue = None
+            self._viz_process = None
             self._visualization_initialized = False
-            logging.info(f"Visualization window '{self.window_name}' closed")
+            logging.info(f"Visualization process for '{self.window_name}' stopped")
 
     def __enter__(self):
         return self

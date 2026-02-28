@@ -21,11 +21,11 @@ import numpy as np
 import pytest
 
 from lerobot.robots.so100_tactile_follower import SO100TactileFollower, SO100TactileFollowerConfig
+from lerobot.sensors import TactileSensorConfig
 from lerobot.utils.constants import OBS_TACTILE
 
 
 def _make_bus_mock() -> MagicMock:
-    """Return a bus mock with just the attributes used by the tactile follower."""
     bus = MagicMock(name="FeetechBusMock")
     bus.is_connected = False
 
@@ -43,7 +43,6 @@ def _make_bus_mock() -> MagicMock:
         yield
 
     bus.torque_disabled.side_effect = _dummy_cm
-
     return bus
 
 
@@ -75,7 +74,12 @@ def tactile_follower():
         ),
         patch.object(SO100TactileFollower, "configure", lambda self: None),
     ):
-        cfg = SO100TactileFollowerConfig(port="/dev/null", tactile_port="/dev/null", tactile_auto_calibrate=False)
+        cfg = SO100TactileFollowerConfig(
+            port="/dev/null",
+            tactile_sensors={
+                "primary": TactileSensorConfig(port="/dev/null", auto_calibrate=False),
+            },
+        )
         robot = SO100TactileFollower(cfg)
         yield robot, tactile_sensor_mock
         if robot.is_connected:
@@ -87,8 +91,9 @@ def test_tactile_follower_observation_includes_tactile_data(tactile_follower):
     robot.connect()
 
     observation = robot.get_observation()
-    assert OBS_TACTILE in observation
-    assert observation[OBS_TACTILE].shape == (16, 32)
+    # Named key: observation.tactile.primary
+    assert f"{OBS_TACTILE}.primary" in observation
+    assert observation[f"{OBS_TACTILE}.primary"].shape == (16, 32)
     tactile_sensor_mock.read_data.assert_called()
 
 
@@ -98,3 +103,31 @@ def test_tactile_follower_disconnect_closes_sensor(tactile_follower):
     robot.disconnect()
 
     tactile_sensor_mock.disconnect.assert_called()
+
+
+def test_tactile_follower_no_sensors_returns_no_tactile_data():
+    """Robot with empty tactile_sensors dict produces no tactile observations."""
+    bus_mock = _make_bus_mock()
+
+    def _bus_side_effect(*_args, **kwargs):
+        bus_mock.motors = kwargs["motors"]
+        motors_order: list[str] = list(bus_mock.motors)
+        bus_mock.sync_read.return_value = {motor: idx for idx, motor in enumerate(motors_order, 1)}
+        bus_mock.sync_write.return_value = None
+        bus_mock.write.return_value = None
+        bus_mock.disable_torque.return_value = None
+        bus_mock.enable_torque.return_value = None
+        bus_mock.is_calibrated = True
+        return bus_mock
+
+    with (
+        patch("lerobot.robots.so_follower.so_follower.FeetechMotorsBus", side_effect=_bus_side_effect),
+        patch.object(SO100TactileFollower, "configure", lambda self: None),
+    ):
+        cfg = SO100TactileFollowerConfig(port="/dev/null")  # empty tactile_sensors
+        robot = SO100TactileFollower(cfg)
+        robot.connect()
+        observation = robot.get_observation()
+        # No tactile keys should appear
+        assert not any(k.startswith(OBS_TACTILE) for k in observation)
+        robot.disconnect()

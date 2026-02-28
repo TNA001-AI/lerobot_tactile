@@ -3,7 +3,6 @@ import serial
 import threading
 import cv2
 import time
-from scipy.ndimage import gaussian_filter  # (still unused unless you enable)
 
 # =========================
 # SAME visualization settings as old code
