@@ -28,7 +28,7 @@ def test_record_cli_parses_so100_tactile_follower():
         args=[
             "--robot.type=so100_tactile_follower",
             "--robot.port=/dev/null",
-            "--robot.tactile_port=/dev/null",
+            '--robot.tactile_sensors={"primary": {"port": "/dev/ttyUSB0"}}',
             "--dataset.repo_id=test/tactile",
             "--dataset.single_task=pick and place",
             "--teleop.type=so100_leader",
@@ -38,8 +38,30 @@ def test_record_cli_parses_so100_tactile_follower():
 
     assert isinstance(cfg.robot, SO100TactileFollowerConfig)
     assert cfg.robot.type == "so100_tactile_follower"
+    assert "primary" in cfg.robot.tactile_sensors
+    assert cfg.robot.tactile_sensors["primary"].port == "/dev/ttyUSB0"
     assert cfg.teleop is not None
     assert cfg.teleop.type == "so100_leader"
+
+
+def test_record_cli_parses_dual_tactile_sensors():
+    cfg = draccus.parse(
+        RecordConfig,
+        args=[
+            "--robot.type=so100_tactile_follower",
+            "--robot.port=/dev/null",
+            '--robot.tactile_sensors={"left": {"port": "/dev/ttyUSB0"}, "right": {"port": "/dev/ttyUSB1"}}',
+            "--dataset.repo_id=test/tactile",
+            "--dataset.single_task=pick and place",
+            "--teleop.type=so100_leader",
+            "--teleop.port=/dev/null",
+        ],
+    )
+
+    assert isinstance(cfg.robot, SO100TactileFollowerConfig)
+    assert set(cfg.robot.tactile_sensors.keys()) == {"left", "right"}
+    assert cfg.robot.tactile_sensors["left"].port == "/dev/ttyUSB0"
+    assert cfg.robot.tactile_sensors["right"].port == "/dev/ttyUSB1"
 
 
 def test_train_cli_parses_act_with_tactile_enabled():
@@ -50,9 +72,11 @@ def test_train_cli_parses_act_with_tactile_enabled():
             "--policy.type=act",
             "--policy.device=cpu",
             "--policy.use_tactile=true",
+            '--policy.tactile_features=["observation.tactile.primary"]',
         ],
     )
 
     assert cfg.policy is not None
     assert isinstance(cfg.policy, ACTConfig)
     assert cfg.policy.use_tactile is True
+    assert cfg.policy.tactile_features == ["observation.tactile.primary"]

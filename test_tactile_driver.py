@@ -15,7 +15,7 @@ def main():
     print("Testing updated tactile sensor with binary protocol...")
     print("=" * 60)
 
-    # Initialize sensor with visualization enabled
+    # Initialize sensor WITHOUT visualization to avoid OpenCV GUI issues
     sensor = TactileSensor(
         port="/dev/ttyUSB0",
         baud_rate=2_000_000,
@@ -56,15 +56,22 @@ def main():
             if data is not None:
                 frame_count += 1
 
+                if sensor.enable_visualization:
+                    sensor.update_visualization(data)
+
                 # Print stats every second
                 now = time.time()
                 if now - last_print_time >= 1.0:
                     fps = frame_count / (now - start_time)
+                    non_zero = np.count_nonzero(data)
                     print(f"Time: {now - start_time:.1f}s | Frames: {frame_count} | FPS: {fps:.1f} | "
-                          f"Min: {data.min():.1f} | Max: {data.max():.1f} | Mean: {data.mean():.1f}")
+                          f"Min: {data.min():.1f} | Max: {data.max():.1f} | Mean: {data.mean():.1f} | NonZero: {non_zero}/{data.size}")
                     last_print_time = now
 
-            time.sleep(0.01)
+                # Alert if non-zero data detected
+                if np.any(data > 0):
+                    print(f"  >>> TOUCH DETECTED! Max pressure: {data.max():.1f} at location {np.unravel_index(data.argmax(), data.shape)}")
+            time.sleep(0.005)
 
     except KeyboardInterrupt:
         print("\n\nStopped by user")
