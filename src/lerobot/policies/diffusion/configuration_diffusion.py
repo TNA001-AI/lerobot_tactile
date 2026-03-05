@@ -110,6 +110,7 @@ class DiffusionConfig(PreTrainedConfig):
             "VISUAL": NormalizationMode.MEAN_STD,
             "STATE": NormalizationMode.MIN_MAX,
             "ACTION": NormalizationMode.MIN_MAX,
+            "TACTILE": NormalizationMode.MEAN_STD,
         }
     )
 
@@ -153,6 +154,19 @@ class DiffusionConfig(PreTrainedConfig):
 
     # Loss computation
     do_mask_loss_for_padding: bool = False
+
+    # Tactile sensor configuration
+    use_tactile: bool = False
+    tactile_encoder_type: str = "cnn"  # choices: ["cnn", "attention"]
+    tactile_input_shape: tuple[int, int] = (16, 32)
+    tactile_dropout: float = 0.3
+    tactile_feature_dim: int = 256  # embedding dim per chunk
+    # Named tactile sensor keys when using multiple sensors.
+    # Leave as None for single sensor mode (uses "observation.tactile" key).
+    tactile_features: list[str] | None = None
+    # Number of feature chunks each tactile sensor is encoded into (concatenated into global_cond).
+    # 1 = single vector per sensor (default); >1 = richer representation.
+    n_tactile_chunks: int = 1
 
     # Training presets
     optimizer_lr: float = 1e-4

@@ -50,10 +50,12 @@ from lerobot.configs.policies import PreTrainedConfig
 from lerobot.policies.pi05.configuration_pi05 import DEFAULT_IMAGE_SIZE, PI05Config
 from lerobot.policies.pretrained import PreTrainedPolicy, T
 from lerobot.policies.rtc.modeling_rtc import RTCProcessor
+from lerobot.policies.tactile.encoder import TactileTokenEncoder
 from lerobot.utils.constants import (
     ACTION,
     OBS_LANGUAGE_ATTENTION_MASK,
     OBS_LANGUAGE_TOKENS,
+    OBS_TACTILE,
     OPENPI_ATTENTION_MASK_VALUE,
 )
 
@@ -579,6 +581,18 @@ class PI05Pytorch(nn.Module):  # see openpi `PI0Pytorch`
         self.time_mlp_in = nn.Linear(action_expert_config.width, action_expert_config.width)
         self.time_mlp_out = nn.Linear(action_expert_config.width, action_expert_config.width)
 
+        # Tactile encoder: encodes tactile maps into prefix tokens for PaliGemma.
+        if config.use_tactile:
+            self.tactile_encoder = TactileTokenEncoder(
+                encoder_type=config.tactile_encoder_type,
+                input_shape=config.tactile_input_shape,
+                feature_dim=config.tactile_feature_dim,
+                n_tokens=config.n_tactile_tokens,
+                dropout=config.tactile_dropout,
+            )
+            # Project tactile token embeddings to paligemma hidden size
+            self.tactile_proj = nn.Linear(config.tactile_feature_dim, paligemma_config.width)
+
         # Initialize gradient checkpointing flag
         self.gradient_checkpointing_enabled = False
 
@@ -638,9 +652,17 @@ class PI05Pytorch(nn.Module):  # see openpi `PI0Pytorch`
         return time.to(dtype=torch.float32, device=device)
 
     def embed_prefix(
-        self, images, img_masks, tokens, masks
+        self, images, img_masks, tokens, masks, tactile_data=None
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Embed images with SigLIP and language tokens with embedding layer."""
+        """Embed images with SigLIP and language tokens with embedding layer.
+
+        Args:
+            images: list of (B, C, H, W) image tensors
+            img_masks: list of (B,) boolean masks
+            tokens: (B, L) language token ids
+            masks: (B, L) language attention masks
+            tactile_data: optional list of (B, H, W) tactile maps, one per sensor
+        """
         embs = []
         pad_masks = []
         att_masks = []
@@ -657,6 +679,20 @@ class PI05Pytorch(nn.Module):  # see openpi `PI0Pytorch`
             embs.append(img_emb)
             pad_masks.append(img_mask[:, None].expand(bsize, num_img_embs))
             att_masks += [0] * num_img_embs
+
+        # Process tactile tokens (injected as prefix tokens before language tokens)
+        if tactile_data is not None and self.config.use_tactile:
+            for tactile_map in tactile_data:
+                # tactile_map: (B, H, W)
+                def tactile_embed_func(t):
+                    tokens_t = self.tactile_encoder(t)  # (B, n_tokens, tactile_feature_dim)
+                    return self.tactile_proj(tokens_t)  # (B, n_tokens, paligemma_width)
+
+                tact_emb = self._apply_checkpoint(tactile_embed_func, tactile_map)
+                bsize, n_tact_tokens = tact_emb.shape[:2]
+                embs.append(tact_emb)
+                pad_masks.append(torch.ones(bsize, n_tact_tokens, dtype=torch.bool, device=tact_emb.device))
+                att_masks += [0] * n_tact_tokens
 
         # Process language tokens
         def lang_embed_func(tokens):
@@ -727,7 +763,7 @@ class PI05Pytorch(nn.Module):  # see openpi `PI0Pytorch`
 
         return embs, pad_masks, att_masks, adarms_cond
 
-    def forward(self, images, img_masks, tokens, masks, actions, noise=None, time=None) -> Tensor:
+    def forward(self, images, img_masks, tokens, masks, actions, noise=None, time=None, tactile_data=None) -> Tensor:
         """Do a full training forward pass and compute the loss."""
         if noise is None:
             noise = self.sample_noise(actions.shape, actions.device)
@@ -739,7 +775,9 @@ class PI05Pytorch(nn.Module):  # see openpi `PI0Pytorch`
         x_t = time_expanded * noise + (1 - time_expanded) * actions
         u_t = noise - actions
 
-        prefix_embs, prefix_pad_masks, prefix_att_masks = self.embed_prefix(images, img_masks, tokens, masks)
+        prefix_embs, prefix_pad_masks, prefix_att_masks = self.embed_prefix(
+            images, img_masks, tokens, masks, tactile_data=tactile_data
+        )
         suffix_embs, suffix_pad_masks, suffix_att_masks, adarms_cond = self.embed_suffix(x_t, time)
 
         if (
@@ -791,6 +829,7 @@ class PI05Pytorch(nn.Module):  # see openpi `PI0Pytorch`
         masks,
         noise=None,
         num_steps=None,
+        tactile_data=None,
         **kwargs: Unpack[ActionSelectKwargs],
     ) -> Tensor:
         """Do a full inference forward and compute the action."""
@@ -809,7 +848,9 @@ class PI05Pytorch(nn.Module):  # see openpi `PI0Pytorch`
             )  # Use config max_action_dim for internal processing
             noise = self.sample_noise(actions_shape, device)
 
-        prefix_embs, prefix_pad_masks, prefix_att_masks = self.embed_prefix(images, img_masks, tokens, masks)
+        prefix_embs, prefix_pad_masks, prefix_att_masks = self.embed_prefix(
+            images, img_masks, tokens, masks, tactile_data=tactile_data
+        )
         prefix_att_2d_masks = make_att_2d_masks(prefix_pad_masks, prefix_att_masks)
         prefix_position_ids = torch.cumsum(prefix_pad_masks, dim=1) - 1
 
@@ -1227,6 +1268,13 @@ class PI05Policy(PreTrainedPolicy):
 
         return self._action_queue.popleft()
 
+    def _extract_tactile_data(self, batch: dict[str, Tensor]) -> list[Tensor] | None:
+        """Extract tactile sensor data from the batch as a list of (B, H, W) tensors."""
+        if not self.config.use_tactile:
+            return None
+        tactile_keys = self.config.tactile_features if self.config.tactile_features else [OBS_TACTILE]
+        return [batch[k] for k in tactile_keys if k in batch] or None
+
     @torch.no_grad()
     def predict_action_chunk(self, batch: dict[str, Tensor], **kwargs: Unpack[ActionSelectKwargs]) -> Tensor:
         """Predict a chunk of actions given environment observations."""
@@ -1235,9 +1283,10 @@ class PI05Policy(PreTrainedPolicy):
         # Prepare inputs
         images, img_masks = self._preprocess_images(batch)
         tokens, masks = batch[f"{OBS_LANGUAGE_TOKENS}"], batch[f"{OBS_LANGUAGE_ATTENTION_MASK}"]
+        tactile_data = self._extract_tactile_data(batch)
 
         # Sample actions using the model (pass through RTC kwargs, no separate state needed for PI05)
-        actions = self.model.sample_actions(images, img_masks, tokens, masks, **kwargs)
+        actions = self.model.sample_actions(images, img_masks, tokens, masks, tactile_data=tactile_data, **kwargs)
 
         # Unpad actions to actual action dimension
         original_action_dim = self.config.output_features[ACTION].shape[0]
@@ -1257,11 +1306,12 @@ class PI05Policy(PreTrainedPolicy):
         # Prepare inputs
         images, img_masks = self._preprocess_images(batch)
         tokens, masks = batch[f"{OBS_LANGUAGE_TOKENS}"], batch[f"{OBS_LANGUAGE_ATTENTION_MASK}"]
+        tactile_data = self._extract_tactile_data(batch)
 
         actions = self.prepare_action(batch)
 
         # Compute loss (no separate state needed for PI05)
-        losses = self.model.forward(images, img_masks, tokens, masks, actions)
+        losses = self.model.forward(images, img_masks, tokens, masks, actions, tactile_data=tactile_data)
 
         # Truncate losses to actual action dimensions
         original_action_dim = self.config.output_features[ACTION].shape[0]

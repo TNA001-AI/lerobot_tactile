@@ -129,6 +129,9 @@ class ACTConfig(PreTrainedConfig):
     # e.g., ["observation.tactile.left", "observation.tactile.right"]
     # Leave as None for single sensor mode (uses "observation.tactile" key).
     tactile_features: list[str] | None = None
+    # Number of transformer tokens each tactile sensor is encoded into.
+    # 1 = single token per sensor (default); >1 = richer representation.
+    n_tactile_tokens: int = 1
 
     # Training and loss computation.
     dropout: float = 0.1

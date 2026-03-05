@@ -68,8 +68,21 @@ class PI05Config(PreTrainedConfig):
             "VISUAL": NormalizationMode.IDENTITY,
             "STATE": NormalizationMode.QUANTILES,  # Pi0.5 uses quantiles for state
             "ACTION": NormalizationMode.QUANTILES,  # Pi0.5 uses quantiles for action
+            "TACTILE": NormalizationMode.MEAN_STD,
         }
     )
+
+    # Tactile sensor configuration
+    use_tactile: bool = False
+    tactile_encoder_type: str = "cnn"  # choices: ["cnn", "attention"]
+    tactile_input_shape: tuple[int, int] = (16, 32)
+    tactile_dropout: float = 0.3
+    tactile_feature_dim: int = 256  # internal CNN output dim before projection to paligemma width
+    # Named tactile sensor keys when using multiple sensors.
+    # Leave as None for single sensor mode (uses "observation.tactile" key).
+    tactile_features: list[str] | None = None
+    # Number of prefix tokens each tactile sensor is encoded into.
+    n_tactile_tokens: int = 1
 
     # Training settings
     gradient_checkpointing: bool = False  # Enable gradient checkpointing for memory optimization
