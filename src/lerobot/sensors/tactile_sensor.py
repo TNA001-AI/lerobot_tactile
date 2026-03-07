@@ -64,6 +64,7 @@ class TactileSensor:
         threshold: float = 25.0,
         noise_scale: float = 30.0,
         temporal_alpha: float = 0.2,
+        display_rows: int = 12,
     ):
         """
         Initialize tactile sensor interface
@@ -79,6 +80,8 @@ class TactileSensor:
             threshold: Threshold for contact detection
             noise_scale: Scale factor for normalizing low-pressure readings
             temporal_alpha: Blending factor for temporal smoothing (0-1)
+            display_rows: Number of rows to show in the visualization window.
+                Set to 12 to hide the 4 silent rows at the top of a 16x32 sensor.
         """
         self.port = port
         self.baud_rate = baud_rate
@@ -106,6 +109,7 @@ class TactileSensor:
         self.threshold = threshold
         self.noise_scale = noise_scale
         self.temporal_alpha = temporal_alpha
+        self.display_rows = min(display_rows, self.ROWS)
         self._prev_frame: Optional[np.ndarray] = None
         self._viz_queue: Optional[mp.Queue] = None
         self._viz_process: Optional[mp.Process] = None
@@ -334,13 +338,14 @@ class TactileSensor:
     def _init_visualization(self):
         """Launch a subprocess to display the tactile visualization window."""
         self._viz_queue = mp.Queue(maxsize=2)
+        display_shape = (self.display_rows, self.shape[1])
         self._viz_process = mp.Process(
             target=_visualization_worker,
-            args=(self._viz_queue, self.window_name, self.shape),
+            args=(self._viz_queue, self.window_name, display_shape),
             daemon=True,
         )
         self._viz_process.start()
-        self._prev_frame = np.zeros(self.shape, dtype=np.float32)
+        self._prev_frame = np.zeros(display_shape, dtype=np.float32)
         self._visualization_initialized = True
         logging.info(f"Visualization process started for '{self.window_name}'")
 
@@ -403,6 +408,9 @@ class TactileSensor:
 
         if data is None:
             return False
+
+        # Crop to display_rows before visualization (hides silent rows at the top)
+        data = data[-self.display_rows:, :]
 
         # Normalize the data
         normalized = self._normalize_data(data)
