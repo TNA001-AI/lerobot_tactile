@@ -160,7 +160,7 @@ class DiffusionConfig(PreTrainedConfig):
     tactile_encoder_type: str = "cnn"  # choices: ["cnn", "attention"]
     tactile_input_shape: tuple[int, int] = (16, 32)
     tactile_dropout: float = 0.3
-    tactile_feature_dim: int = 256  # embedding dim per chunk
+    tactile_feature_dim: int = 64  # embedding dim per chunk
     # Named tactile sensor keys when using multiple sensors.
     # Leave as None for single sensor mode (uses "observation.tactile" key).
     tactile_features: list[str] | None = None
