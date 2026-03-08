@@ -342,3 +342,86 @@ lerobot-train \
     --policy.device=cuda:0 \
     --wandb.enable=true \
     --policy.repo_id=Tna001/act_tactile_tok4_peg
+
+# ACT without tactile — n_tactile_tokens=4 (richer tactile representation)
+lerobot-train \
+    --dataset.repo_id=Tna001/tactile_peg_hole \
+    --policy.type=act \
+    --policy.use_tactile=false \
+    --policy.tactile_features='["observation.tactile.primary"]' \
+    --policy.n_tactile_tokens=4 \
+    --output_dir=outputs/train/act_peg \
+    --job_name=act_peg \
+    --batch_size=32 \
+    --num_workers=8 \
+    --policy.device=cuda:0 \
+    --wandb.enable=true \
+    --policy.repo_id=Tna001/act_peg
+
+# ============================================================
+# Mar 8 eval
+# ============================================================
+
+# ACT eval with tactile (peg and hole)
+lerobot-record \
+    --robot.type=so100_tactile_follower \
+    --robot.port=/dev/ttyACM0 \
+    --robot.id=follower_arm \
+    --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
+    --robot.tactile_sensors='{primary: {"port": "/dev/ttyUSB0", "baud_rate": 2000000}}' \
+    --display_data=true \
+    --dataset.repo_id=Tna001/eval_tactile_act_tok4_peg\
+    --dataset.num_episodes=10 \
+    --dataset.episode_time_s=30 \
+    --dataset.single_task="Peg" \
+    --policy.path=/home/tao/lerobot_tactile/outputs/train/act_tactile_tok4_peg/checkpoints/last/pretrained_model \
+    --dataset.push_to_hub=False
+
+# ACT eval without tactile (peg and hole)
+lerobot-record \
+    --robot.type=so100_tactile_follower \
+    --robot.port=/dev/ttyACM0 \
+    --robot.id=follower_arm \
+    --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
+    --display_data=true \
+    --dataset.repo_id=Tna001/eval_act_peg\
+    --dataset.num_episodes=10 \
+    --dataset.episode_time_s=30 \
+    --dataset.single_task="Peg" \
+    --policy.path=/home/tao/lerobot_tactile/outputs/train/act_peg/checkpoints/last/pretrained_model \
+    --dataset.push_to_hub=False
+
+
+# DP eval without tactile (Tube)
+# Maybe try different num_inference_steps: 6, 10, 15, 20
+lerobot-record \
+    --robot.type=so100_tactile_follower \
+    --robot.port=/dev/ttyACM0 \
+    --robot.id=follower_arm \
+    --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
+    --display_data=true \
+    --dataset.repo_id=Tna001/eval_dp \
+    --dataset.num_episodes=10 \
+    --dataset.episode_time_s=3000 \
+    --dataset.single_task="Tube" \
+    --policy.path=/home/tao/lerobot_tactile/outputs/train/dp_without_tactile/checkpoints/last/pretrained_model \
+    --policy.noise_scheduler_type=DDIM \
+    --policy.num_inference_steps=10s \
+    --dataset.push_to_hub=False
+
+# DP eval with tactile (Tube)
+lerobot-record \
+    --robot.type=so100_tactile_follower \
+    --robot.port=/dev/ttyACM0 \
+    --robot.id=follower_arm \
+    --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
+    --robot.tactile_sensors='{primary: {"port": "/dev/ttyUSB0", "baud_rate": 2000000}}' \
+    --display_data=true \
+    --dataset.repo_id=Tna001/eval_tactile_dp_1 \
+    --dataset.num_episodes=10 \
+    --dataset.episode_time_s=3000 \
+    --dataset.single_task="Tube" \
+    --policy.path=/home/tao/lerobot_tactile/outputs/train/dp_tactile_chunk1/checkpoints/last/pretrained_model \
+    --policy.noise_scheduler_type=DDIM \
+    --policy.num_inference_steps=6 \
+    --dataset.push_to_hub=False
