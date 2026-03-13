@@ -104,6 +104,8 @@ class DiffusionConfig(PreTrainedConfig):
     n_obs_steps: int = 2
     horizon: int = 16
     n_action_steps: int = 8
+    # Frame stride for subsampling dataset frames. Set to 3 to train at 10Hz on 30Hz data.
+    frame_stride: int = 1
 
     normalization_mapping: dict[str, NormalizationMode] = field(
         default_factory=lambda: {
@@ -116,7 +118,7 @@ class DiffusionConfig(PreTrainedConfig):
 
     # The original implementation doesn't sample frames for the last 7 steps,
     # which avoids excessive padding and leads to improved training results.
-    drop_n_last_frames: int = 7  # horizon - n_action_steps - n_obs_steps + 1
+    drop_n_last_frames: int = 7  # (horizon - n_action_steps - n_obs_steps + 1) * frame_stride
 
     # Architecture / modeling.
     # Vision backbone.
@@ -160,7 +162,7 @@ class DiffusionConfig(PreTrainedConfig):
     tactile_encoder_type: str = "cnn"  # choices: ["cnn", "attention"]
     tactile_input_shape: tuple[int, int] = (16, 32)
     tactile_dropout: float = 0.3
-    tactile_feature_dim: int = 64  # embedding dim per chunk
+    tactile_feature_dim: int = 32  # embedding dim per chunk
     # Named tactile sensor keys when using multiple sensors.
     # Leave as None for single sensor mode (uses "observation.tactile" key).
     tactile_features: list[str] | None = None
@@ -178,6 +180,9 @@ class DiffusionConfig(PreTrainedConfig):
 
     def __post_init__(self):
         super().__post_init__()
+
+        # Update drop_n_last_frames to account for frame_stride.
+        self.drop_n_last_frames = (self.horizon - self.n_action_steps - self.n_obs_steps + 1) * self.frame_stride
 
         """Input validation (not exhaustive)."""
         if not self.vision_backbone.startswith("resnet"):
@@ -262,11 +267,11 @@ class DiffusionConfig(PreTrainedConfig):
 
     @property
     def observation_delta_indices(self) -> list:
-        return list(range(1 - self.n_obs_steps, 1))
+        return [i * self.frame_stride for i in range(1 - self.n_obs_steps, 1)]
 
     @property
     def action_delta_indices(self) -> list:
-        return list(range(1 - self.n_obs_steps, 1 - self.n_obs_steps + self.horizon))
+        return [i * self.frame_stride for i in range(1 - self.n_obs_steps, 1 - self.n_obs_steps + self.horizon)]
 
     @property
     def reward_delta_indices(self) -> None:
