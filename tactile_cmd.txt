@@ -733,9 +733,7 @@ lerobot-record \
 lerobot-train \
     --dataset.repo_id=Tna001/tactile_peg_hole_100 \
     --policy.type=act \
-    --policy.use_tactile=true \
-    --policy.tactile_features='["observation.tactile.primary"]' \
-    --policy.n_tactile_tokens=4 \
+    --policy.use_tactile=false \
     --output_dir=/data/tao/outputs/train/act_tok4_peg_100 \
     --job_name=act_tok4_peg_100 \
     --batch_size=32 \
@@ -812,10 +810,10 @@ lerobot-record \
     --display_data=true \
     --dataset.repo_id=Tna001/eval_dp_vision_only_10hz \
     --dataset.fps=10 \
-    --dataset.num_episodes=100 \
+    --dataset.num_episodes=51 \
     --dataset.episode_time_s=30 \
     --dataset.single_task="Tube" \
-    --policy.path=/home/tao/lerobot_tactile/outputs/train/dp_vision_only_10hz/checkpoints/140000/pretrained_model \
+    --policy.path=/data/tao/outputs/train/dp_vision_only_10hz/checkpoints/200000/pretrained_model \
     --policy.noise_scheduler_type=DDIM \
     --policy.num_inference_steps=16 \
     --dataset.push_to_hub=False \
@@ -835,10 +833,79 @@ lerobot-record \
     --display_data=true \
     --dataset.repo_id=Tna001/eval_dp_vision_tactile_10hz \
     --dataset.fps=10 \
-    --dataset.num_episodes=100 \
+    --dataset.num_episodes=51 \
     --dataset.episode_time_s=30 \
     --dataset.single_task="Tube" \
-    --policy.path=/home/tao/lerobot_tactile/outputs/train/dp_vision_tactile_10hz/checkpoints/last/pretrained_model \
+    --policy.path=/data/tao/outputs/train/dp_vision_tactile_10hz/checkpoints/200000/pretrained_model \
     --policy.noise_scheduler_type=DDIM \
     --policy.num_inference_steps=16 \
-    --dataset.push_to_hub=False
+    --dataset.push_to_hub=False \
+    --resume=true
+
+# eval Act peg 100 no tactile
+lerobot-record \
+    --robot.type=so100_tactile_follower \
+    --robot.port=/dev/ttyACM0 \
+    --robot.id=follower_arm \
+    --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
+    --display_data=true \
+    --dataset.repo_id=Tna001/eval_act_tok4_peg_100 \
+    --dataset.num_episodes=10 \
+    --dataset.episode_time_s=30000 \
+    --dataset.single_task="Peg" \
+    --policy.path=/data/tao/outputs/train/act_tok4_peg_100/checkpoints/last/pretrained_model \
+    --dataset.push_to_hub=False 
+
+# eval PI05 tube 100 no tactile
+lerobot-record \
+    --robot.type=so100_tactile_follower \
+    --robot.port=/dev/ttyACM0 \
+    --robot.id=follower_arm \
+    --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
+    --display_data=false \
+    --dataset.repo_id=Tna001/eval_pi05_expertonly \
+    --dataset.num_episodes=10 \
+    --dataset.episode_time_s=3000 \
+    --dataset.single_task="pick and place" \
+    --policy.path=/data/tao/outputs/train/pi05_expertonly/checkpoints/last/pretrained_model
+
+# ============================================================
+# Mar 14 train
+# ============================================================
+
+# vision only (no state, no tactile), 10hz
+lerobot-train \
+    --dataset.repo_id=Tna001/tactile_peg_hole_100 \
+    --policy.type=diffusion \
+    --policy.use_tactile=false \
+    --policy.crop_is_random=true \
+    --policy.frame_stride=3 \
+    --policy.input_features='{"observation.images.top": {"type": "VISUAL", "shape": [3, 224, 224]}}' \
+    --output_dir=/data/tao/outputs/train/dp_peg_vision_only_10hz \
+    --job_name=dp_peg_vision_only_10hz \
+    --batch_size=64 \
+    --steps=300000 \
+    --num_workers=8 \
+    --policy.device=cuda:0 \
+    --wandb.enable=true \
+    --policy.repo_id=Tna001/dp_peg_vision_only_10hz
+
+# vision + tactile (no state), 10hz
+lerobot-train \
+    --dataset.repo_id=Tna001/tactile_peg_hole_100 \
+    --policy.type=diffusion \
+    --policy.use_tactile=true \
+    --policy.tactile_features='["observation.tactile.primary"]' \
+    --policy.n_tactile_chunks=1 \
+    --policy.tactile_feature_dim=32 \
+    --policy.crop_is_random=true \
+    --policy.frame_stride=3 \
+    --policy.input_features='{"observation.images.top": {"type": "VISUAL", "shape": [3, 224, 224]}, "observation.tactile.primary": {"type": "TACTILE", "shape": [16, 32]}}' \
+    --output_dir=/data/tao/outputs/train/dp_peg_vision_tactile_10hz \
+    --job_name=dp_peg_vision_tactile_10hz \
+    --batch_size=64 \
+    --steps=300000 \
+    --num_workers=8 \
+    --policy.device=cuda:0 \
+    --wandb.enable=true \
+    --policy.repo_id=Tna001/dp_peg_vision_tactile_10hz
