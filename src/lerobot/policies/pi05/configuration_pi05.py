@@ -36,6 +36,9 @@ class PI05Config(PreTrainedConfig):
     n_obs_steps: int = 1
     chunk_size: int = 50  # Number of action steps to predict, in openpi called "action_horizon"
     n_action_steps: int = 50  # Number of action steps to execute
+    # Frame stride for subsampling dataset frames. Set to 3 to train at 10Hz on 30Hz data.
+    frame_stride: int = 1
+    drop_n_last_frames: int = 0  # (chunk_size - n_action_steps) * frame_stride
 
     # Shorter state and action vectors will be padded to these dimensions
     max_state_dim: int = 32
@@ -113,6 +116,9 @@ class PI05Config(PreTrainedConfig):
     def __post_init__(self):
         super().__post_init__()
 
+        # Update drop_n_last_frames to account for frame_stride.
+        self.drop_n_last_frames = (self.chunk_size - self.n_action_steps) * self.frame_stride
+
         # Validate configuration
         if self.n_action_steps > self.chunk_size:
             raise ValueError(
@@ -175,7 +181,7 @@ class PI05Config(PreTrainedConfig):
 
     @property
     def action_delta_indices(self) -> list:
-        return list(range(self.chunk_size))
+        return [i * self.frame_stride for i in range(self.chunk_size)]
 
     @property
     def reward_delta_indices(self) -> None:

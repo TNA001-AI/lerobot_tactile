@@ -2,6 +2,7 @@ sudo chmod 666 /dev/ttyACM0
 sudo chmod 666 /dev/ttyACM1
 
 export CUDA_VISIBLE_DEVICES=1
+huggingface-cli login
 
 lerobot-calibrate \
     --robot.type=so100_tactile_follower \
@@ -869,6 +870,85 @@ lerobot-record \
     --dataset.single_task="pick and place" \
     --policy.path=/data/tao/outputs/train/pi05_expertonly/checkpoints/last/pretrained_model
 
+# Server
+# vision + tactile (no state), 10hz
+export CUDA_VISIBLE_DEVICES=0
+lerobot-train \
+    --dataset.repo_id=Tna001/tactile_tube_100 \
+    --policy.type=diffusion \
+    --policy.use_tactile=true \
+    --policy.tactile_features='["observation.tactile.primary"]' \
+    --policy.n_tactile_chunks=2 \
+    --policy.tactile_feature_dim=32 \
+    --policy.crop_is_random=true \
+    --policy.frame_stride=3 \
+    --policy.input_features='{"observation.images.top": {"type": "VISUAL", "shape": [3, 224, 224]}, "observation.tactile.primary": {"type": "TACTILE", "shape": [16, 32]}}' \
+    --output_dir=/local/robopil/tao/dp_vision_tactile_10hz_chunk_2 \
+    --job_name=dp_vision_tactile_10hz_chunk_2 \
+    --batch_size=64 \
+    --steps=300000 \
+    --num_workers=8 \
+    --policy.device=cuda:0 \
+    --wandb.enable=true \
+    --policy.repo_id=Tna001/dp_vision_tactile_10hz_chunk_2
+
+# 10hz with state
+export CUDA_VISIBLE_DEVICES=3
+lerobot-train \
+    --dataset.repo_id=Tna001/tactile_tube_100 \
+    --policy.type=diffusion \
+    --policy.use_tactile=false \
+    --policy.crop_is_random=true \
+    --policy.frame_stride=3 \
+    --output_dir=/local/robopil/tao/dp_without_tactile_10hz \
+    --job_name=dp_without_tactile_10hz \
+    --batch_size=64 \
+    --steps=400000 \
+    --num_workers=8 \
+    --policy.device=cuda:0 \
+    --wandb.enable=true \
+    --policy.repo_id=Tna001/dp_without_tactile_10hz
+
+# Pi0.5 without tactile — train_expert_only
+lerobot-train \
+    --dataset.repo_id=Tna001/tactile_tube_100 \
+    --policy.type=pi05 \
+    --policy.use_tactile=false \
+    --policy.tactile_features='["observation.tactile.primary"]' \
+    --policy.n_tactile_tokens=4 \
+    --policy.tactile_feature_dim=256 \
+    --policy.dtype=bfloat16 \
+    --policy.gradient_checkpointing=true \
+    --policy.train_expert_only=true \
+    --output_dir=/local/robopil/tao/pi05_expertonly \
+    --job_name=pi05_tactile_expertonly \
+    --batch_size=16 \
+    --steps=40000 \
+    --num_workers=8 \
+    --policy.device=cuda:0 \
+    --wandb.enable=true \
+    --policy.repo_id=Tna001/pi05_expertonly
+
+# Pi0.5 with tactile — train_expert_only
+lerobot-train \
+    --dataset.repo_id=Tna001/tactile_tube_100 \
+    --policy.type=pi05 \
+    --policy.use_tactile=true \
+    --policy.tactile_features='["observation.tactile.primary"]' \
+    --policy.n_tactile_tokens=4 \
+    --policy.tactile_feature_dim=256 \
+    --policy.dtype=bfloat16 \
+    --policy.gradient_checkpointing=true \
+    --policy.train_expert_only=true \
+    --output_dir=/local/robopil/tao/pi05_tactile_expertonly \
+    --job_name=pi05_tactile_expertonly \
+    --batch_size=16 \
+    --steps=40000 \
+    --num_workers=8 \
+    --policy.device=cuda:0 \
+    --wandb.enable=true \
+    --policy.repo_id=Tna001/pi05_tactile_expertonly
+
 # ============================================================
 # Mar 14 train
 # ============================================================
@@ -909,3 +989,124 @@ lerobot-train \
     --policy.device=cuda:0 \
     --wandb.enable=true \
     --policy.repo_id=Tna001/dp_peg_vision_tactile_10hz
+
+# Pi0.5 without tactile — train_expert_only
+lerobot-train \
+    --dataset.repo_id=Tna001/tactile_tube_100 \
+    --policy.type=pi05 \
+    --policy.use_tactile=false \
+    --policy.dtype=bfloat16 \
+    --policy.gradient_checkpointing=true \
+    --policy.train_expert_only=true \
+    --policy.frame_stride=3 \
+    --output_dir=/data/tao/outputs/train/pi05_expertonly \
+    --job_name=pi05_expertonly \
+    --batch_size=16 \
+    --steps=40000 \
+    --num_workers=8 \
+    --policy.device=cuda:0 \
+    --wandb.enable=true \
+    --policy.repo_id=Tna001/pi05_expertonly
+
+# Pi0.5 with tactile — train_expert_only
+lerobot-train \
+    --dataset.repo_id=Tna001/tactile_tube_100 \
+    --policy.type=pi05 \
+    --policy.use_tactile=true \
+    --policy.tactile_features='["observation.tactile.primary"]' \
+    --policy.n_tactile_tokens=4 \
+    --policy.tactile_feature_dim=256 \
+    --policy.dtype=bfloat16 \
+    --policy.gradient_checkpointing=true \
+    --policy.train_expert_only=true \
+    --policy.frame_stride=3 \
+    --output_dir=/data/tao/outputs/train/pi05_tactile_expertonly \
+    --job_name=pi05_tactile_expertonly \
+    --batch_size=16 \
+    --steps=40000 \
+    --num_workers=8 \
+    --policy.device=cuda:0 \
+    --wandb.enable=true \
+    --policy.repo_id=Tna001/pi05_tactile_expertonly
+    
+# DP peg eval 10hz vision only
+lerobot-record \
+    --robot.type=so100_tactile_follower \
+    --robot.port=/dev/ttyACM0 \
+    --robot.id=follower_arm \
+    --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
+    --teleop.type=so100_leader \
+    --teleop.port=/dev/ttyACM1 \
+    --teleop.id=leader_arm \
+    --dataset.reset_time_s=15 \
+    --display_data=true \
+    --dataset.repo_id=Tna001/eval_peg_dp_vision_only_10hz \
+    --dataset.fps=10 \
+    --dataset.num_episodes=51 \
+    --dataset.episode_time_s=30 \
+    --dataset.single_task="Peg" \
+    --policy.path=/data/tao/outputs/train/dp_peg_vision_only_10hz/checkpoints/200000/pretrained_model \
+    --policy.noise_scheduler_type=DDIM \
+    --policy.num_inference_steps=10 \
+    --dataset.push_to_hub=False \
+    --resume=true
+
+# DP peg eval 10hz with tactile
+lerobot-record \
+    --robot.type=so100_tactile_follower \
+    --robot.port=/dev/ttyACM0 \
+    --robot.id=follower_arm \
+    --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
+    --robot.tactile_sensors='{primary: {"port": "/dev/ttyUSB0", "baud_rate": 2000000}}' \
+    --teleop.type=so100_leader \
+    --teleop.port=/dev/ttyACM1 \
+    --teleop.id=leader_arm \
+    --dataset.reset_time_s=10 \
+    --display_data=true \
+    --dataset.repo_id=Tna001/eval_peg_dp_vision_tactile_10hz \
+    --dataset.fps=10 \
+    --dataset.num_episodes=51 \
+    --dataset.episode_time_s=30 \
+    --dataset.single_task="Tube" \
+    --policy.path=/data/tao/outputs/train/dp_peg_vision_tactile_10hz/checkpoints/300000/pretrained_model \
+    --policy.noise_scheduler_type=DDIM \
+    --policy.num_inference_steps=10 \
+    --dataset.push_to_hub=False \
+    --resume=true
+
+
+# eval PI05 tube 100 no tactile 10hz
+lerobot-record \
+    --robot.type=so100_tactile_follower \
+    --robot.port=/dev/ttyACM0 \
+    --robot.id=follower_arm \
+    --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
+    --teleop.type=so100_leader \
+    --teleop.port=/dev/ttyACM1 \
+    --teleop.id=leader_arm \
+    --dataset.repo_id=Tna001/eval_pi05_expertonly \
+    --dataset.num_episodes=500 \
+    --dataset.episode_time_s=30 \
+    --dataset.single_task="Insert the test tube into the tube rack" \
+    --dataset.fps=10 \
+    --dataset.reset_time_s=10 \
+    --policy.path=/data/tao/outputs/train/pi05_expertonly/checkpoints/last/pretrained_model \
+    --resume=true
+
+# eval PI05 tube 100 with tactile
+lerobot-record \
+    --robot.type=so100_tactile_follower \
+    --robot.port=/dev/ttyACM0 \
+    --robot.id=follower_arm \
+    --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
+    --robot.tactile_sensors='{primary: {"port": "/dev/ttyUSB0", "baud_rate": 2000000}}' \
+    --teleop.type=so100_leader \
+    --teleop.port=/dev/ttyACM1 \
+    --teleop.id=leader_arm \
+    --dataset.repo_id=Tna001/eval_tactile_pi05_expertonly \
+    --dataset.num_episodes=500 \
+    --dataset.episode_time_s=30 \
+    --dataset.single_task="Insert the test tube into the tube rack" \
+    --dataset.fps=10 \
+    --dataset.reset_time_s=10 \
+    --policy.path=/data/tao/outputs/train/pi05_tactile_expertonly/checkpoints/last/pretrained_model
