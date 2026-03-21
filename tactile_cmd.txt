@@ -769,7 +769,7 @@ lerobot-train \
     --policy.crop_is_random=true \
     --policy.frame_stride=3 \
     --policy.input_features='{"observation.images.top": {"type": "VISUAL", "shape": [3, 224, 224]}}' \
-    --output_dir=outputs/train/dp_vision_only_10hz \
+    --output_dir=outputs/train/dp_vision_only_10hz_test \
     --job_name=dp_vision_only_10hz \
     --batch_size=64 \
     --steps=300000 \
