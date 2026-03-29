@@ -84,7 +84,8 @@ from lerobot.policies.wall_x.utils import (
     process_grounding_points,
     replace_action_token,
 )
-from lerobot.utils.constants import ACTION, OBS_STATE
+from lerobot.policies.tactile.encoder import TactileTokenEncoder
+from lerobot.utils.constants import ACTION, OBS_STATE, OBS_TACTILE
 
 logger = logging.get_logger(__name__)
 
@@ -456,11 +457,14 @@ class Qwen2_5_VLMoEForAction(Qwen2_5_VLForConditionalGeneration):
         action_token_id = self.processor.tokenizer.convert_tokens_to_ids("<|action|>")
         propri_token_id = self.processor.tokenizer.convert_tokens_to_ids("<|propri|>")
 
+        tactile_token_id = self.processor.tokenizer.convert_tokens_to_ids("<|tactile|>")
+
         # Store action token ID mappings
         self.action_token_id_set = {
             "fast_action_token_list": fast_action_token_list,
             "propri_token_id": propri_token_id,
             "action_token_id": action_token_id,
+            "tactile_token_id": tactile_token_id,
         }
 
     def add_lora(self, r=8, lora_alpha=32, target_modules=["q_proj", "v_proj"], lora_dropout=0.1):
@@ -718,14 +722,15 @@ class Qwen2_5_VLMoEForAction(Qwen2_5_VLForConditionalGeneration):
         second_per_grid_ts: torch.Tensor | None = None,
         dof_mask: torch.FloatTensor | None = None,
         agent_pos_mask: torch.FloatTensor | None = None,
+        tactile_embeds: torch.FloatTensor | None = None,
         **kwargs,
     ) -> tuple | Qwen2_5_VLACausalLMOutputWithPast:
         """
         Forward pass for training with multi-modal inputs including vision, text, and action data.
 
         This method handles the complete forward pass during training, processing various input modalities
-        including images, videos, text, proprioceptive data, and action sequences. It computes losses
-        for both language modeling and action prediction using flow matching.
+        including images, videos, text, proprioceptive data, tactile data, and action sequences.
+        It computes losses for both language modeling and action prediction using flow matching.
 
         Args:
             input_ids (torch.LongTensor, optional): Input token IDs
@@ -750,6 +755,7 @@ class Qwen2_5_VLMoEForAction(Qwen2_5_VLForConditionalGeneration):
             second_per_grid_ts (torch.Tensor, optional): Time interval per temporal grid
             dof_mask (torch.FloatTensor, optional): Degrees of freedom mask for action tokens
             agent_pos_mask (torch.FloatTensor, optional): Agent position mask for proprioceptive data
+            tactile_embeds (torch.FloatTensor, optional): Pre-computed tactile embeddings (B, n_tokens, hidden_size)
             **kwargs: Additional keyword arguments
 
         Returns:
@@ -862,6 +868,15 @@ class Qwen2_5_VLMoEForAction(Qwen2_5_VLForConditionalGeneration):
                 dummy_forward = self.action_preprocessor.proprioception_proj(dummy_input)
                 dummy_loss = sum(p.sum() for p in dummy_forward)
                 inputs_embeds = inputs_embeds + 0 * dummy_loss
+
+            # Process tactile embeddings (pre-computed by WallXPolicy)
+            if tactile_embeds is not None:
+                tactile_embeds = tactile_embeds.to(inputs_embeds.device, inputs_embeds.dtype)
+                mask = input_ids == self.action_token_id_set["tactile_token_id"]
+                mask_unsqueezed = mask.unsqueeze(-1)
+                mask_expanded = mask_unsqueezed.expand_as(inputs_embeds)
+                tactile_mask = mask_expanded.to(inputs_embeds.device)
+                inputs_embeds = inputs_embeds.masked_scatter(tactile_mask, tactile_embeds)
 
             # Process action chunk data
             if action_chunk is not None:
@@ -1008,6 +1023,7 @@ class Qwen2_5_VLMoEForAction(Qwen2_5_VLForConditionalGeneration):
         num_inference_timesteps: int | None = 10,
         dof_mask: torch.FloatTensor | None = None,
         agent_pos_mask: torch.FloatTensor | None = None,
+        tactile_embeds: torch.FloatTensor | None = None,
         re_generate: bool = False,
         **kwargs,
     ):
@@ -1130,6 +1146,12 @@ class Qwen2_5_VLMoEForAction(Qwen2_5_VLForConditionalGeneration):
                 proprioception_mask = input_ids == self.action_token_id_set["propri_token_id"]
                 proprio_embed = proprio_embed.to(torch.bfloat16)
                 inputs_embeds[proprioception_mask] = proprio_embed.reshape(-1, inputs_embeds.shape[-1])
+
+            # Process tactile embeddings (pre-computed by WallXPolicy)
+            if tactile_embeds is not None:
+                tactile_embeds = tactile_embeds.to(inputs_embeds.device, inputs_embeds.dtype)
+                tactile_mask = input_ids == self.action_token_id_set["tactile_token_id"]
+                inputs_embeds[tactile_mask] = tactile_embeds.reshape(-1, inputs_embeds.shape[-1])
 
             if attention_mask is not None:
                 attention_mask = attention_mask.to(inputs_embeds.device)
@@ -1411,6 +1433,7 @@ class Qwen2_5_VLMoEForAction(Qwen2_5_VLForConditionalGeneration):
         proprioception=None,
         dof_mask=None,
         agent_pos_mask=None,
+        tactile_embeds=None,
         **kwargs,
     ):
         """
@@ -1534,6 +1557,7 @@ class Qwen2_5_VLMoEForAction(Qwen2_5_VLForConditionalGeneration):
                 "proprioception": proprioception,
                 "dof_mask": dof_mask,
                 "agent_pos_mask": agent_pos_mask,
+                "tactile_embeds": tactile_embeds,
             }
         )
         return model_inputs
@@ -1718,8 +1742,32 @@ class WallXPolicy(PreTrainedPolicy):
             action_tokenizer_path=config.action_tokenizer_path,
             attn_implementation=config.attn_implementation,
         )
+        # Add <|tactile|> special token if not already in tokenizer.
+        if config.use_tactile:
+            tokenizer = self.model.processor.tokenizer
+            if "<|tactile|>" not in tokenizer.get_vocab():
+                tokenizer.add_special_tokens({"additional_special_tokens": ["<|tactile|>"]})
+                self.model.resize_token_embeddings(len(tokenizer))
+                # Re-define action token IDs now that tokenizer has changed
+                self.model.define_action_token_id()
+
         self.model.to(config.device)
         self.model.to_bfloat16_for_selected_params()
+
+        # Tactile encoder: encodes tactile maps into tokens for the VLM.
+        if config.use_tactile:
+            self.tactile_encoder = TactileTokenEncoder(
+                encoder_type=config.tactile_encoder_type,
+                input_shape=config.tactile_input_shape,
+                feature_dim=config.tactile_feature_dim,
+                n_tokens=config.n_tactile_tokens,
+                dropout=config.tactile_dropout,
+            )
+            # Project tactile token embeddings to Qwen hidden size
+            qwen_hidden_size = self.model.config.hidden_size
+            self.tactile_proj = nn.Linear(config.tactile_feature_dim, qwen_hidden_size)
+            self.tactile_encoder.to(config.device)
+            self.tactile_proj.to(config.device)
 
         self.reset()
 
@@ -1728,6 +1776,29 @@ class WallXPolicy(PreTrainedPolicy):
         self._queues = {
             ACTION: deque(maxlen=self.config.n_action_steps),
         }
+
+    def _extract_tactile_data(self, batch: dict[str, Tensor]) -> list[Tensor] | None:
+        """Extract tactile sensor data from the batch as a list of (B, H, W) tensors."""
+        if not self.config.use_tactile:
+            return None
+        tactile_keys = self.config.tactile_features if self.config.tactile_features else [OBS_TACTILE]
+        return [batch[k] for k in tactile_keys if k in batch] or None
+
+    def _encode_tactile(self, tactile_data: list[Tensor]) -> Tensor:
+        """Encode tactile sensor data into projected token embeddings.
+
+        Args:
+            tactile_data: List of (B, H, W) tensors, one per sensor.
+
+        Returns:
+            (B, total_tokens, hidden_size) tensor of tactile embeddings.
+        """
+        all_embeds = []
+        for tactile_map in tactile_data:
+            tokens = self.tactile_encoder(tactile_map)  # (B, n_tokens, tactile_feature_dim)
+            proj = self.tactile_proj(tokens)  # (B, n_tokens, hidden_size)
+            all_embeds.append(proj)
+        return torch.cat(all_embeds, dim=1)  # (B, n_sensors * n_tokens, hidden_size)
 
     def get_optim_params(self):
         """Get parameters for optimization."""
@@ -1756,6 +1827,14 @@ class WallXPolicy(PreTrainedPolicy):
 
         # Get batch size from state tensor
         batch_size = batch[OBS_STATE].shape[0]
+
+        # ==================== PROCESS TACTILE ====================
+        tactile_data = self._extract_tactile_data(batch)
+        tactile_embeds = None
+        n_tactile_tokens_total = 0
+        if tactile_data is not None and self.config.use_tactile:
+            tactile_embeds = self._encode_tactile(tactile_data)  # (B, total_tokens, hidden_size)
+            n_tactile_tokens_total = tactile_embeds.shape[1]
 
         # ==================== PROCESS ALL SAMPLES ====================
         all_image_inputs = []
@@ -1813,6 +1892,7 @@ class WallXPolicy(PreTrainedPolicy):
                 PRIORITY_ORDER,
                 img_keys,
                 generate_subtask_ratio=GENERATE_SUBTASK_RATIO,
+                n_tactile_tokens=n_tactile_tokens_total,
             )
 
             text = process_grounding_points(
@@ -1913,6 +1993,8 @@ class WallXPolicy(PreTrainedPolicy):
         inputs["action_chunk"] = action
         inputs["dof_mask"] = dof_mask
         inputs["moe_token_types"] = moe_token_types
+        if tactile_embeds is not None:
+            inputs["tactile_embeds"] = tactile_embeds
         inputs["frame_index"] = (
             batch["frame_index"]
             if "frame_index" in batch

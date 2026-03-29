@@ -18,7 +18,7 @@ from lerobot.configs.policies import PreTrainedConfig
 from lerobot.configs.types import FeatureType, NormalizationMode, PolicyFeature
 from lerobot.optim.optimizers import AdamWConfig
 from lerobot.optim.schedulers import CosineDecayWithWarmupSchedulerConfig
-from lerobot.utils.constants import ACTION, OBS_STATE
+from lerobot.utils.constants import ACTION, OBS_STATE, OBS_TACTILE
 
 
 @PreTrainedConfig.register_subclass("wall_x")
@@ -47,8 +47,21 @@ class WallXConfig(PreTrainedConfig):
             "VISUAL": NormalizationMode.IDENTITY,
             "STATE": NormalizationMode.MEAN_STD,
             "ACTION": NormalizationMode.MEAN_STD,
+            "TACTILE": NormalizationMode.MEAN_STD,
         }
     )
+
+    # ==================== Tactile Sensor Configuration ====================
+    use_tactile: bool = False
+    tactile_encoder_type: str = "cnn"  # choices: ["cnn", "attention"]
+    tactile_input_shape: tuple[int, int] = (16, 32)
+    tactile_dropout: float = 0.3
+    tactile_feature_dim: int = 256  # internal CNN output dim before projection to Qwen hidden size
+    # Named tactile sensor keys when using multiple sensors.
+    # Leave as None for single sensor mode (uses "observation.tactile" key).
+    tactile_features: list[str] | None = None
+    # Number of tokens each tactile sensor is encoded into.
+    n_tactile_tokens: int = 1
 
     # ==================== Action Prediction ====================
     # Pretrained model paths
@@ -87,6 +100,11 @@ class WallXConfig(PreTrainedConfig):
 
         if self.prediction_mode not in ["diffusion", "fast"]:
             raise ValueError(f"prediction_mode must be 'diffusion' or 'fast', got {self.prediction_mode}")
+
+        if self.use_tactile and self.tactile_encoder_type not in ["cnn", "attention"]:
+            raise ValueError(
+                f"Invalid tactile_encoder_type: {self.tactile_encoder_type!r}. Choose 'cnn' or 'attention'."
+            )
 
         # Assign use_fast_tokenizer based on prediction_mode
         if self.prediction_mode == "fast":
