@@ -21,7 +21,7 @@ from lerobot.optim.schedulers import (
     CosineDecayWithWarmupSchedulerConfig,
 )
 from lerobot.policies.rtc.configuration_rtc import RTCConfig
-from lerobot.utils.constants import OBS_IMAGES
+from lerobot.utils.constants import OBS_IMAGES, OBS_TACTILE
 
 
 @PreTrainedConfig.register_subclass("smolvla")
@@ -37,6 +37,7 @@ class SmolVLAConfig(PreTrainedConfig):
             "VISUAL": NormalizationMode.IDENTITY,
             "STATE": NormalizationMode.MEAN_STD,
             "ACTION": NormalizationMode.MEAN_STD,
+            "TACTILE": NormalizationMode.MEAN_STD,
         }
     )
 
@@ -106,6 +107,19 @@ class SmolVLAConfig(PreTrainedConfig):
     # Real-Time Chunking (RTC) configuration
     rtc_config: RTCConfig | None = None
 
+    # Tactile sensor configuration
+    use_tactile: bool = False
+    tactile_encoder_type: str = "cnn"  # choices: ["cnn", "attention"]
+    tactile_input_shape: tuple[int, int] = (16, 32)
+    tactile_dropout: float = 0.3
+    tactile_feature_dim: int = 256  # internal CNN output dim before projection to VLM hidden size
+    # Named tactile sensor keys when using multiple sensors.
+    # e.g., ["observation.tactile.left", "observation.tactile.right"]
+    # Leave as None for single sensor mode (uses "observation.tactile" key).
+    tactile_features: list[str] | None = None
+    # Number of prefix tokens each tactile sensor is encoded into.
+    n_tactile_tokens: int = 1
+
     compile_model: bool = False  # Whether to use torch.compile for model optimization
     compile_mode: str = "max-autotune"  # Torch compile mode
 
@@ -121,6 +135,11 @@ class SmolVLAConfig(PreTrainedConfig):
         if self.use_delta_joint_actions_aloha:
             raise NotImplementedError(
                 "`use_delta_joint_actions_aloha` is used by smolvla for aloha real models. It is not ported yet in LeRobot."
+            )
+        if self.use_tactile and self.tactile_encoder_type not in ["cnn", "attention"]:
+            raise ValueError(
+                f"Invalid tactile encoder type. Got {self.tactile_encoder_type}, "
+                f"expected one of ['cnn', 'attention']"
             )
 
     def validate_features(self) -> None:
