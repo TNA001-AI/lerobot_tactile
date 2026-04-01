@@ -28,8 +28,8 @@ import serial
 
 def _visualization_worker(queue: mp.Queue, window_name: str, shape: tuple):
     """Subprocess entry point: receives colormap frames and displays via OpenCV."""
-    window_width = shape[1] * 30
-    window_height = shape[0] * 30
+    window_width = shape[1] * 60
+    window_height = shape[0] * 60
     cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
     cv2.resizeWindow(window_name, window_width, window_height)
     while True:
