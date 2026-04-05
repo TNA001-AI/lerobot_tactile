@@ -418,8 +418,9 @@ class ACT(nn.Module):
             batch_size = batch[OBS_IMAGES][0].shape[0]
         elif OBS_ENV_STATE in batch:
             batch_size = batch[OBS_ENV_STATE].shape[0]
-        elif self.config.tactile_features[0] in batch:
-            batch_size = batch[self.config.tactile_features[0]].shape[0]
+        elif self.config.use_tactile:
+            tactile_keys = self.config.tactile_features if self.config.tactile_features else [OBS_TACTILE]
+            batch_size = batch[tactile_keys[0]].shape[0]
         else:
             raise ValueError("Batch must contain at least one of: OBS_IMAGES, OBS_ENV_STATE, or tactile_features")
 

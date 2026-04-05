@@ -24,50 +24,6 @@ from lerobot.processor.pipeline import ObservationProcessorStep
 from lerobot.utils.constants import OBS_TACTILE
 
 
-class TactileNormalizationProcessorStep(ObservationProcessorStep):
-    """Normalize tactile sensor data with thresholding and noise filtering"""
-
-    def __init__(self, threshold=30, noise_scale=50, gaussian_sigma=0.1):
-        """
-        Args:
-            threshold: Minimum tactile value threshold
-            noise_scale: Scale for noise normalization
-            gaussian_sigma: Gaussian noise standard deviation for data augmentation
-        """
-        self.threshold = threshold
-        self.noise_scale = noise_scale
-        self.gaussian_sigma = gaussian_sigma
-
-    def observation(self, obs: dict[str, Any]) -> dict[str, Any]:
-        for key in list(obs.keys()):
-            if key != OBS_TACTILE and not key.startswith(OBS_TACTILE + "."):
-                continue
-            tactile_data = obs[key]
-
-            # Convert to tensor if numpy array
-            if isinstance(tactile_data, np.ndarray):
-                tactile_data = torch.from_numpy(tactile_data).float()
-
-            # Apply threshold
-            tactile_data = torch.clamp(tactile_data - self.threshold, min=0)
-
-            # Normalize by noise scale
-            tactile_data = tactile_data / self.noise_scale
-
-            # Ensure data is in range [0, 1]
-            tactile_data = torch.clamp(tactile_data, 0, 1)
-
-            obs[key] = tactile_data
-
-        return obs
-
-    def transform_features(
-        self, features: dict[PipelineFeatureType, dict[str, PolicyFeature]]
-    ) -> dict[PipelineFeatureType, dict[str, PolicyFeature]]:
-        """Features remain unchanged after normalization"""
-        return features
-
-
 class TactileValidationProcessorStep(ObservationProcessorStep):
     """Validate tactile sensor data format and dimensions"""
 

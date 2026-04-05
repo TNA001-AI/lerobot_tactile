@@ -28,7 +28,6 @@ from lerobot.processor import (
     UnnormalizerProcessorStep,
 )
 from lerobot.processor.tactile_processor import (
-    TactileNormalizationProcessorStep,
     TactileValidationProcessorStep,
 )
 from lerobot.processor.converters import policy_action_to_transition, transition_to_policy_action
@@ -67,7 +66,6 @@ def make_act_pre_post_processors(
     if config.use_tactile:
         input_steps.extend([
             TactileValidationProcessorStep(expected_shape=config.tactile_input_shape),
-            TactileNormalizationProcessorStep(),
         ])
     
     # Add common processing steps

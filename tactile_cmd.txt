@@ -2066,65 +2066,6 @@ lerobot-train \
   --wandb.enable=true \
   --wandb.project=lerobot-pens_bag
 
-## ===== Pi0.5 全参数 fine-tune (2x4090, 48GB VRAM) =====
-
-# 全参数微调 (无 LoRA, 无 train_expert_only)
-# 使用 accelerate 双卡 DDP，gradient_checkpointing + bf16 节省显存
-# batch_size=2 per GPU, effective batch_size=4
-
-# 实验1: Pi0.5 全参数微调 (无 tactile)
-accelerate launch \
-  --multi_gpu \
-  --num_processes=2 \
-  $(which lerobot-train) \
-  --dataset.repo_id=Tna001/tactile_tube_new \
-  --policy.pretrained_path=lerobot/pi05_base \
-  --policy.type=pi05 \
-  --policy.use_tactile=false \
-  --policy.gradient_checkpointing=true \
-  --policy.dtype=bfloat16 \
-  --policy.freeze_vision_encoder=false \
-  --policy.train_expert_only=false \
-  --policy.compile_model=true \
-  --policy.optimizer_lr=5e-5 \
-  --policy.scheduler_warmup_steps=500 \
-  --policy.scheduler_decay_steps=30000 \
-  --output_dir=/data/tao/pi05_full_finetune \
-  --job_name=pi05_full_finetune_GPU2 \
-  --steps=30000 \
-  --batch_size=2 \
-  --num_workers=8 \
-  --wandb.enable=true \
-  --policy.repo_id=Tna001/pi05_full_finetune
-
-# 实验2: Pi0.5 全参数微调 (with tactile)
-accelerate launch \
-  --multi_gpu \
-  --num_processes=2 \
-  $(which lerobot-train) \
-  --dataset.repo_id=Tna001/tactile_tube_new \
-  --policy.pretrained_path=lerobot/pi05_base \
-  --policy.type=pi05 \
-  --policy.use_tactile=true \
-  --policy.tactile_features='["observation.tactile.primary"]' \
-  --policy.n_tactile_tokens=4 \
-  --policy.tactile_feature_dim=256 \
-  --policy.gradient_checkpointing=true \
-  --policy.dtype=bfloat16 \
-  --policy.freeze_vision_encoder=false \
-  --policy.train_expert_only=false \
-  --policy.compile_model=true \
-  --policy.optimizer_lr=5e-5 \
-  --policy.scheduler_warmup_steps=500 \
-  --policy.scheduler_decay_steps=30000 \
-  --output_dir=/local/robopil/tao/pi05_tactile_full_finetune \
-  --job_name=pi05_tactile_full_finetune \
-  --steps=30000 \
-  --batch_size=2 \
-  --num_workers=8 \
-  --wandb.enable=true \
-  --policy.repo_id=Tna001/pi05_tactile_full_finetune
-
 ## ===== Pi0.5 全参数 fine-tune (8xL40S, 8x44.4GB VRAM) =====
 
 # DDP 每卡存完整模型+优化器，全参数 Adam 需 ~44GB 超出 L40S 44.4GB
@@ -2159,107 +2100,123 @@ accelerate launch \
   --policy.optimizer_lr=1e-4 \
   --policy.scheduler_warmup_steps=500 \
   --policy.scheduler_decay_steps=15000 \
-  --output_dir=/data/tao/pi05_full_fsdp_8xL40S \
+  --policy.compile_model=true \
+  --output_dir=/local/robopil/tao/pi05_full_fsdp_8xL40S \
   --job_name=pi05_full_fsdp_8xL40S \
   --steps=15000 \
   --batch_size=5 \
-  --num_workers=8 \
+  --num_workers=16 \
+  --save_freq=5000 \
   --wandb.enable=true \
   --policy.repo_id=Tna001/pi05_full_fsdp_8xL40S
   
-  --policy.compile_model=true \
-# A2: FSDP 全参数微调 (with tactile)
-PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
-accelerate launch \
-  --use_fsdp \
-  --mixed_precision=bf16 \
-  --fsdp_sharding_strategy=FULL_SHARD \
-  --fsdp_auto_wrap_policy=TRANSFORMER_BASED_WRAP \
-  --fsdp_backward_prefetch=BACKWARD_PRE \
-  --fsdp_forward_prefetch=true \
-  --fsdp_state_dict_type=FULL_STATE_DICT \
-  --num_processes=8 \
-  $(which lerobot-train) \
-  --dataset.repo_id=Tna001/tactile_tube_new \
-  --policy.pretrained_path=lerobot/pi05_base \
-  --policy.type=pi05 \
-  --policy.use_tactile=true \
-  --policy.tactile_features='["observation.tactile.primary"]' \
-  --policy.n_tactile_tokens=4 \
-  --policy.tactile_feature_dim=256 \
-  --policy.gradient_checkpointing=true \
-  --policy.dtype=bfloat16 \
-  --policy.freeze_vision_encoder=false \
-  --policy.train_expert_only=false \
-  --policy.compile_model=true \
-  --policy.optimizer_lr=1e-4 \
-  --policy.scheduler_warmup_steps=500 \
-  --policy.scheduler_decay_steps=15000 \
-  --output_dir=/data/tao/pi05_tactile_full_fsdp_8xL40S \
-  --job_name=pi05_tactile_full_fsdp_8xL40S \
-  --steps=15000 \
-  --batch_size=8 \
-  --num_workers=8 \
-  --wandb.enable=true \
-  --policy.repo_id=Tna001/pi05_tactile_full_fsdp_8xL40S
 
-# ---- 方案B: 冻结 vision encoder + DDP ----
-# vision encoder (~900M params) 冻结后不需 optimizer states
-# 训练参数 ~2B, Adam states ~16GB, 每卡可装下
+srun --account=bgku-delta-gpu --partition=gpuH200x8-interactive --nodes=1 --gpus-per-node=1 --tasks=1 --tasks-per-node=1 --cpus-per-task=16 --mem=200g --time=00:30:00 --pty bash
 
-# B1: 冻结 vision, 全参数训其余 (无 tactile)
+# B1: DDP 全参数微调 2xH200
 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
 accelerate launch \
   --multi_gpu \
-  --num_processes=8 \
+  --num_processes=2 \
+  --mixed_precision=bf16 \
   $(which lerobot-train) \
   --dataset.repo_id=Tna001/tactile_tube_new \
   --policy.pretrained_path=lerobot/pi05_base \
   --policy.type=pi05 \
   --policy.use_tactile=false \
-  --policy.gradient_checkpointing=true \
+  --policy.gradient_checkpointing=false \
   --policy.dtype=bfloat16 \
-  --policy.freeze_vision_encoder=true \
+  --policy.freeze_vision_encoder=false \
   --policy.train_expert_only=false \
-  --policy.compile_model=true \
   --policy.optimizer_lr=1e-4 \
   --policy.scheduler_warmup_steps=500 \
   --policy.scheduler_decay_steps=15000 \
-  --output_dir=/data/tao/pi05_freezevit_8xL40S \
-  --job_name=pi05_freezevit_8xL40S \
+  --policy.compile_model=true \
+  --output_dir=/u/ntao/checkpoints/pi05_full_ddp_2xH200 \
+  --job_name=pi05_full_ddp_2xH200 \
   --steps=15000 \
-  --batch_size=8 \
+  --batch_size=16 \
   --num_workers=8 \
+  --save_freq=1000 \
   --wandb.enable=true \
-  --policy.repo_id=Tna001/pi05_freezevit_8xL40S
+  --policy.repo_id=Tna001/pi05_full_ddp_2xH200
 
-# B2: 冻结 vision, 全参数训其余 (with tactile)
-PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
-accelerate launch \
-  --multi_gpu \
-  --num_processes=8 \
-  $(which lerobot-train) \
+srun --account=bgku-delta-gpu --partition=gpuH200x8-interactive --nodes=1 --gpus-per-node=1 --tasks=1 --tasks-per-node=1 --cpus-per-task=16 --mem=200g --time=00:30:00 --pty bash
+
+lerobot-train \
   --dataset.repo_id=Tna001/tactile_tube_new \
   --policy.pretrained_path=lerobot/pi05_base \
   --policy.type=pi05 \
-  --policy.use_tactile=true \
-  --policy.tactile_features='["observation.tactile.primary"]' \
-  --policy.n_tactile_tokens=4 \
-  --policy.tactile_feature_dim=256 \
-  --policy.gradient_checkpointing=true \
+  --policy.use_tactile=false \
+  --policy.gradient_checkpointing=false \
   --policy.dtype=bfloat16 \
-  --policy.freeze_vision_encoder=true \
+  --policy.freeze_vision_encoder=false \
   --policy.train_expert_only=false \
-  --policy.compile_model=true \
   --policy.optimizer_lr=1e-4 \
   --policy.scheduler_warmup_steps=500 \
   --policy.scheduler_decay_steps=15000 \
-  --output_dir=/data/tao/pi05_tactile_freezevit_8xL40S \
-  --job_name=pi05_tactile_freezevit_8xL40S \
-  --steps=15000 \
-  --batch_size=8 \
-  --num_workers=8 \
+  --policy.compile_model=true \
+  --output_dir=/u/ntao/checkpoints/pi05_full_ddp_1xH200 \
+  --job_name=pi05_full_ddp_1xH200 \
+  --steps=150000 \
+  --batch_size=32 \
+  --num_workers=16 \
+  --save_freq=10000 \
   --wandb.enable=true \
-  --policy.repo_id=Tna001/pi05_tactile_freezevit_8xL40S
+  --policy.repo_id=Tna001/pi05_full_ddp_1xH200
 
-  srun --account=bgku-delta-gpu --partition=gpuA100x4-interactive --nodes=1 --gpus-per-node=1 --tasks=1 --tasks-per-node=16 --cpus-per-task=1 --mem=20g --time=00:30:00 --pty bash 
+lerobot-record \
+  --robot.type=so100_tactile_follower \
+  --robot.port=/dev/ttyACM0 \
+  --robot.id=follower_arm \
+  --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
+  --robot.tactile_sensors='{primary: {"port": "/dev/ttyUSB0", "baud_rate": 2000000}}' \
+  --teleop.type=so100_leader \
+  --teleop.port=/dev/ttyACM1 \
+  --teleop.id=leader_arm \
+  --dataset.repo_id=Tna001/eval_pi05_tactile \
+  --dataset.num_episodes=40 \
+  --dataset.episode_time_s=30 \
+  --dataset.single_task="Insert the test tube into the tube rack" \
+  --dataset.fps=10 \
+  --dataset.reset_time_s=10 \
+  --policy.path=/data/wesley/pi0.5_checkpoints/17218606/pretrained_model \
+  --policy.device=cuda \
+  --resume=true
+
+lerobot-record \
+  --robot.type=so100_tactile_follower \
+  --robot.port=/dev/ttyACM0 \
+  --robot.id=follower_arm \
+  --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
+  --teleop.type=so100_leader \
+  --teleop.port=/dev/ttyACM1 \
+  --teleop.id=leader_arm \
+  --dataset.repo_id=Tna001/eval_pi05_full_5 \
+  --dataset.num_episodes=500 \
+  --dataset.episode_time_s=30 \
+  --dataset.single_task="Tube" \
+  --dataset.fps=10 \
+  --dataset.reset_time_s=10 \
+  --policy.path=/data/tao/050000/pretrained_model \
+  --policy.device=cuda \
+  --resume=true
+
+# collect more data
+lerobot-record \
+    --robot.type=so100_tactile_follower \
+    --robot.port=/dev/ttyACM0 \
+    --robot.id=follower_arm \
+    --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
+    --robot.tactile_sensors='{primary: {"port": "/dev/ttyUSB0", "baud_rate": 2000000}}' \
+    --teleop.type=so100_leader \
+    --teleop.port=/dev/ttyACM1 \
+    --teleop.id=leader_arm \
+    --display_data=false \
+    --dataset.repo_id=Tna001/tactile_tube_200 \
+    --dataset.num_episodes=100 \
+    --dataset.episode_time_s=30 \
+    --dataset.reset_time_s=5 \
+    --dataset.single_task="Insert the test tube into the tube rack" \
+    --dataset.fps=10 \
+    --resume=true
