@@ -44,7 +44,7 @@ class SO100TactileFollower(SO100Follower):
                     port=sensor_cfg.port,
                     baud_rate=sensor_cfg.baud_rate,
                     shape=sensor_cfg.shape,
-                    auto_calibrate=sensor_cfg.auto_calibrate,
+                    baseline=sensor_cfg.baseline,
                     enable_visualization=sensor_cfg.enable_visualization,
                 )
                 self._tactile_sensors[name] = sensor
@@ -71,6 +71,25 @@ class SO100TactileFollower(SO100Follower):
                 observation[obs_key] = np.zeros(sensor_cfg.shape, dtype=np.float32)
 
         return observation
+
+    def wait_for_tactile_calibration(self, timeout_s: float = 30.0) -> dict[str, bool]:
+        """Block until every tactile sensor reports a baseline, or ``timeout_s`` elapses.
+
+        Returns a ``{sensor_name: calibrated}`` dict so callers can log which
+        sensors timed out. The timeout applies to each sensor individually.
+        """
+        return {
+            name: sensor.wait_for_calibration(timeout_s=timeout_s)
+            for name, sensor in self._tactile_sensors.items()
+        }
+
+    def tactile_sensor_metadata(self) -> dict[str, dict]:
+        """Per-sensor config + calibration snapshot, keyed by sensor name.
+
+        Written into the dataset's ``info.json`` under ``tactile_sensors`` so the
+        normalization regime that produced recorded frames is recoverable.
+        """
+        return {name: sensor.metadata() for name, sensor in self._tactile_sensors.items()}
 
     @property
     def observation_features(self) -> dict[str, PolicyFeature]:

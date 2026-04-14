@@ -27,7 +27,7 @@ from lerobot.utils.constants import OBS_TACTILE
 class TactileValidationProcessorStep(ObservationProcessorStep):
     """Validate tactile sensor data format and dimensions"""
 
-    def __init__(self, expected_shape=(16, 32)):
+    def __init__(self, expected_shape=(12, 32)):
         """
         Args:
             expected_shape: Expected shape of tactile sensor array (H, W)

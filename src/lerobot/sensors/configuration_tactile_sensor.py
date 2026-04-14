@@ -35,6 +35,8 @@ class TactileSensorConfig:
 
     port: str = "/dev/ttyUSB0"
     baud_rate: int = 2_000_000
-    shape: tuple[int, int] = (16, 32)
-    auto_calibrate: bool = True
+    shape: tuple[int, int] = (12, 32)
+    # Leave as None to auto-calibrate on first read. Set to a scalar (e.g. 20.0)
+    # to skip calibration and use a fixed baseline applied to every pixel.
+    baseline: float | None = None
     enable_visualization: bool = True

@@ -81,6 +81,7 @@ dependencies = [
     "jsonlines>=4.0.0,<5.0.0",
     "pynput>=1.7.8,<1.9.0",
     "pyserial>=3.5,<4.0",
+    "flexitac>=0.2.2",
 
     "wandb>=0.24.0,<0.25.0",
     "draccus==0.10.0", # TODO: Relax version constraint

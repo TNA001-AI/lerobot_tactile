@@ -78,7 +78,7 @@ class PI05Config(PreTrainedConfig):
     # Tactile sensor configuration
     use_tactile: bool = False
     tactile_encoder_type: str = "cnn"  # choices: ["cnn", "attention"]
-    tactile_input_shape: tuple[int, int] = (16, 32)
+    tactile_input_shape: tuple[int, int] = (12, 32)
     tactile_dropout: float = 0.3
     tactile_feature_dim: int = 256  # internal CNN output dim before projection to paligemma width
     # Named tactile sensor keys when using multiple sensors.

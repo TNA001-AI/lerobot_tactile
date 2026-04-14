@@ -19,8 +19,6 @@ def main():
     sensor = TactileSensor(
         port="/dev/ttyUSB0",
         baud_rate=2_000_000,
-        timeout=0.01,
-        auto_calibrate=True,
         enable_visualization=True,
         window_name="Tactile Test - Binary Protocol",
         threshold=25.0,

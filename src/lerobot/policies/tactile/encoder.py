@@ -27,7 +27,7 @@ from torch import Tensor, nn
 class TactileCNN(nn.Module):
     """Tactile CNN backbone — outputs (B, feature_dim)."""
 
-    def __init__(self, input_shape: tuple[int, int] = (16, 32), feature_dim: int = 256, dropout: float = 0.3):
+    def __init__(self, input_shape: tuple[int, int] = (12, 32), feature_dim: int = 256, dropout: float = 0.3):
         super().__init__()
         self.input_shape = input_shape
         self.feature_dim = feature_dim
@@ -65,7 +65,7 @@ class TactileCNN(nn.Module):
 class TactileAttentionCNN(nn.Module):
     """Tactile CNN with spatial attention — outputs (B, feature_dim)."""
 
-    def __init__(self, input_shape: tuple[int, int] = (16, 32), feature_dim: int = 256, dropout: float = 0.4):
+    def __init__(self, input_shape: tuple[int, int] = (12, 32), feature_dim: int = 256, dropout: float = 0.4):
         super().__init__()
         self.input_shape = input_shape
         self.feature_dim = feature_dim
