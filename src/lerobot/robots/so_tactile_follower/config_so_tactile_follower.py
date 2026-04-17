@@ -22,9 +22,9 @@ from lerobot.sensors import TactileSensorConfig
 from ..config import RobotConfig
 
 
-@RobotConfig.register_subclass("so100_tactile_follower")
+@RobotConfig.register_subclass("so_tactile_follower")
 @dataclass
-class SO100TactileFollowerConfig(RobotConfig):
+class SOTactileFollowerConfig(RobotConfig):
     # Port to connect to the arm
     port: str
 

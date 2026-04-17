@@ -35,6 +35,6 @@ class TactileSensorConfig:
 
     port: str = "/dev/ttyUSB0"
     baud_rate: int = 2_000_000
-    shape: tuple[int, int] = (16, 32)
+    shape: tuple[int, int] = (12, 32)
     auto_calibrate: bool = True
     enable_visualization: bool = True

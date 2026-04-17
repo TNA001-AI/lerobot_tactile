@@ -5,7 +5,7 @@ export CUDA_VISIBLE_DEVICES=1
 huggingface-cli login
 
 lerobot-calibrate \
-    --robot.type=so100_tactile_follower \
+    --robot.type=so_tactile_follower \
     --robot.port=/dev/ttyACM0 \
     --robot.id=follower_arm
 
@@ -15,7 +15,7 @@ lerobot-calibrate \
     --teleop.id=leader_arm
 
 lerobot-teleoperate \
-    --robot.type=so100_tactile_follower \
+    --robot.type=so_tactile_follower \
     --robot.port=/dev/ttyACM0 \
     --robot.id=follower_arm \
     --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -26,7 +26,7 @@ lerobot-teleoperate \
 
 
 lerobot-record \
-    --robot.type=so100_tactile_follower \
+    --robot.type=so_tactile_follower \
     --robot.port=/dev/ttyACM0 \
     --robot.id=follower_arm \
     --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -58,7 +58,7 @@ lerobot-train \
 
 
 lerobot-record \
-    --robot.type=so100_tactile_follower \
+    --robot.type=so_tactile_follower \
     --robot.port=/dev/ttyACM0 \
     --robot.id=follower_arm \
     --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -111,7 +111,7 @@ lerobot-train \
 
 # ACT eval with tactile
 lerobot-record \
-    --robot.type=so100_tactile_follower \
+    --robot.type=so_tactile_follower \
     --robot.port=/dev/ttyACM0 \
     --robot.id=follower_arm \
     --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -125,7 +125,7 @@ lerobot-record \
 
 # ACT eval without tactile
 lerobot-record \
-    --robot.type=so100_tactile_follower \
+    --robot.type=so_tactile_follower \
     --robot.port=/dev/ttyACM0 \
     --robot.id=follower_arm \
     --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -225,7 +225,7 @@ lerobot-train \
 
 # DP eval with tactile
 lerobot-record \
-    --robot.type=so100_tactile_follower \
+    --robot.type=so_tactile_follower \
     --robot.port=/dev/ttyACM0 \
     --robot.id=follower_arm \
     --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -313,7 +313,7 @@ lerobot-train \
 
 # pi05 eval with tactile
 lerobot-record \
-    --robot.type=so100_tactile_follower \
+    --robot.type=so_tactile_follower \
     --robot.port=/dev/ttyACM0 \
     --robot.id=follower_arm \
     --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -329,7 +329,7 @@ lerobot-record \
 # Task1 Pipette
 # ============================================================
 lerobot-record \
-    --robot.type=so100_tactile_follower \
+    --robot.type=so_tactile_follower \
     --robot.port=/dev/ttyACM0 \
     --robot.id=follower_arm \
     --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -349,7 +349,7 @@ lerobot-record \
 # Task3 peg and hole
 # ============================================================
 lerobot-record \
-    --robot.type=so100_tactile_follower \
+    --robot.type=so_tactile_follower \
     --robot.port=/dev/ttyACM0 \
     --robot.id=follower_arm \
     --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -401,7 +401,7 @@ lerobot-train \
 
 # ACT eval with tactile (peg and hole)
 lerobot-record \
-    --robot.type=so100_tactile_follower \
+    --robot.type=so_tactile_follower \
     --robot.port=/dev/ttyACM0 \
     --robot.id=follower_arm \
     --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -416,7 +416,7 @@ lerobot-record \
 
 # ACT eval without tactile (peg and hole)
 lerobot-record \
-    --robot.type=so100_tactile_follower \
+    --robot.type=so_tactile_follower \
     --robot.port=/dev/ttyACM0 \
     --robot.id=follower_arm \
     --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -432,7 +432,7 @@ lerobot-record \
 # DP eval without tactile (Tube)
 # Maybe try different num_inference_steps: 6, 10, 15, 20
 lerobot-record \
-    --robot.type=so100_tactile_follower \
+    --robot.type=so_tactile_follower \
     --robot.port=/dev/ttyACM0 \
     --robot.id=follower_arm \
     --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -448,7 +448,7 @@ lerobot-record \
 
 # DP eval with tactile (Tube)
 lerobot-record \
-    --robot.type=so100_tactile_follower \
+    --robot.type=so_tactile_follower \
     --robot.port=/dev/ttyACM0 \
     --robot.id=follower_arm \
     --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -469,7 +469,7 @@ lerobot-record \
 
 # 10hz
 lerobot-record \
-    --robot.type=so100_tactile_follower \
+    --robot.type=so_tactile_follower \
     --robot.port=/dev/ttyACM0 \
     --robot.id=follower_arm \
     --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -490,7 +490,7 @@ lerobot-record \
     
 # Crop
 lerobot-record \
-    --robot.type=so100_tactile_follower \
+    --robot.type=so_tactile_follower \
     --robot.port=/dev/ttyACM0 \
     --robot.id=follower_arm \
     --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -509,7 +509,7 @@ lerobot-record \
 
 # small
 lerobot-record \
-    --robot.type=so100_tactile_follower \
+    --robot.type=so_tactile_follower \
     --robot.port=/dev/ttyACM0 \
     --robot.id=follower_arm \
     --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -527,7 +527,7 @@ lerobot-record \
 
 # collect more data
 lerobot-record \
-    --robot.type=so100_tactile_follower \
+    --robot.type=so_tactile_follower \
     --robot.port=/dev/ttyACM0 \
     --robot.id=follower_arm \
     --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -624,7 +624,7 @@ lerobot-train \
 
 # DP eval 10hz
 lerobot-record \
-    --robot.type=so100_tactile_follower \
+    --robot.type=so_tactile_follower \
     --robot.port=/dev/ttyACM0 \
     --robot.id=follower_arm \
     --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -645,7 +645,7 @@ lerobot-record \
 
 # DP eval 10hz with tactile
 lerobot-record \
-    --robot.type=so100_tactile_follower \
+    --robot.type=so_tactile_follower \
     --robot.port=/dev/ttyACM0 \
     --robot.id=follower_arm \
     --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -667,7 +667,7 @@ lerobot-record \
 
 # eval small model
 lerobot-record \
-    --robot.type=so100_tactile_follower \
+    --robot.type=so_tactile_follower \
     --robot.port=/dev/ttyACM0 \
     --robot.id=follower_arm \
     --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -685,7 +685,7 @@ lerobot-record \
 
 # collect more data
 lerobot-record \
-    --robot.type=so100_tactile_follower \
+    --robot.type=so_tactile_follower \
     --robot.port=/dev/ttyACM0 \
     --robot.id=follower_arm \
     --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -717,7 +717,7 @@ lerobot-train \
     --policy.repo_id=Tna001/act_tactile_tok4_peg_100
 
 lerobot-record \
-    --robot.type=so100_tactile_follower \
+    --robot.type=so_tactile_follower \
     --robot.port=/dev/ttyACM0 \
     --robot.id=follower_arm \
     --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -748,7 +748,7 @@ lerobot-train \
 # ============================================================
 
 lerobot-record \
-    --robot.type=so100_tactile_follower \
+    --robot.type=so_tactile_follower \
     --robot.port=/dev/ttyACM0 \
     --robot.id=follower_arm \
     --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -788,7 +788,7 @@ lerobot-train \
     --policy.tactile_feature_dim=32 \
     --policy.crop_is_random=true \
     --policy.frame_stride=3 \
-    --policy.input_features='{"observation.images.top": {"type": "VISUAL", "shape": [3, 224, 224]}, "observation.tactile.primary": {"type": "TACTILE", "shape": [16, 32]}}' \
+    --policy.input_features='{"observation.images.top": {"type": "VISUAL", "shape": [3, 224, 224]}, "observation.tactile.primary": {"type": "TACTILE", "shape": [12, 32]}}' \
     --output_dir=outputs/train/dp_vision_tactile_10hz \
     --job_name=dp_vision_tactile_10hz \
     --batch_size=64 \
@@ -800,7 +800,7 @@ lerobot-train \
 
 # DP eval 10hz vision only
 lerobot-record \
-    --robot.type=so100_tactile_follower \
+    --robot.type=so_tactile_follower \
     --robot.port=/dev/ttyACM0 \
     --robot.id=follower_arm \
     --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -822,7 +822,7 @@ lerobot-record \
 
 # DP eval 10hz with tactile
 lerobot-record \
-    --robot.type=so100_tactile_follower \
+    --robot.type=so_tactile_follower \
     --robot.port=/dev/ttyACM0 \
     --robot.id=follower_arm \
     --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -845,7 +845,7 @@ lerobot-record \
 
 # eval Act peg 100 no tactile
 lerobot-record \
-    --robot.type=so100_tactile_follower \
+    --robot.type=so_tactile_follower \
     --robot.port=/dev/ttyACM0 \
     --robot.id=follower_arm \
     --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -859,7 +859,7 @@ lerobot-record \
 
 # eval PI05 tube 100 no tactile
 lerobot-record \
-    --robot.type=so100_tactile_follower \
+    --robot.type=so_tactile_follower \
     --robot.port=/dev/ttyACM0 \
     --robot.id=follower_arm \
     --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -882,7 +882,7 @@ lerobot-train \
     --policy.tactile_feature_dim=32 \
     --policy.crop_is_random=true \
     --policy.frame_stride=3 \
-    --policy.input_features='{"observation.images.top": {"type": "VISUAL", "shape": [3, 224, 224]}, "observation.tactile.primary": {"type": "TACTILE", "shape": [16, 32]}}' \
+    --policy.input_features='{"observation.images.top": {"type": "VISUAL", "shape": [3, 224, 224]}, "observation.tactile.primary": {"type": "TACTILE", "shape": [12, 32]}}' \
     --output_dir=/local/robopil/tao/dp_vision_tactile_10hz_chunk_2 \
     --job_name=dp_vision_tactile_10hz_chunk_2 \
     --batch_size=64 \
@@ -980,7 +980,7 @@ lerobot-train \
     --policy.tactile_feature_dim=32 \
     --policy.crop_is_random=true \
     --policy.frame_stride=3 \
-    --policy.input_features='{"observation.images.top": {"type": "VISUAL", "shape": [3, 224, 224]}, "observation.tactile.primary": {"type": "TACTILE", "shape": [16, 32]}}' \
+    --policy.input_features='{"observation.images.top": {"type": "VISUAL", "shape": [3, 224, 224]}, "observation.tactile.primary": {"type": "TACTILE", "shape": [12, 32]}}' \
     --output_dir=/data/tao/outputs/train/dp_peg_vision_tactile_10hz \
     --job_name=dp_peg_vision_tactile_10hz \
     --batch_size=64 \
@@ -1048,7 +1048,7 @@ lerobot-train \
     
 # DP peg eval 10hz vision only
 lerobot-record \
-    --robot.type=so100_tactile_follower \
+    --robot.type=so_tactile_follower \
     --robot.port=/dev/ttyACM0 \
     --robot.id=follower_arm \
     --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -1070,7 +1070,7 @@ lerobot-record \
 
 # DP peg eval 10hz with tactile
 lerobot-record \
-    --robot.type=so100_tactile_follower \
+    --robot.type=so_tactile_follower \
     --robot.port=/dev/ttyACM0 \
     --robot.id=follower_arm \
     --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -1094,7 +1094,7 @@ lerobot-record \
 
 # eval PI05 tube 100 no tactile 10hz
 lerobot-record \
-    --robot.type=so100_tactile_follower \
+    --robot.type=so_tactile_follower \
     --robot.port=/dev/ttyACM0 \
     --robot.id=follower_arm \
     --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -1112,7 +1112,7 @@ lerobot-record \
 
 # eval PI05 tube 100 with tactile
 lerobot-record \
-    --robot.type=so100_tactile_follower \
+    --robot.type=so_tactile_follower \
     --robot.port=/dev/ttyACM0 \
     --robot.id=follower_arm \
     --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -1447,7 +1447,7 @@ lerobot-train \
   --policy.repo_id=Tna001/pi05_tactile_expertonly_tube
 
 lerobot-record \
-  --robot.type=so100_tactile_follower \
+  --robot.type=so_tactile_follower \
   --robot.port=/dev/ttyACM0 \
   --robot.id=follower_arm \
   --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -1465,7 +1465,7 @@ lerobot-record \
   --resume=true
 
 lerobot-record \
-  --robot.type=so100_tactile_follower \
+  --robot.type=so_tactile_follower \
   --robot.port=/dev/ttyACM0 \
   --robot.id=follower_arm \
   --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -1524,7 +1524,7 @@ lerobot-train \
   --wandb.project=lerobot-peg
 
 lerobot-record \
-  --robot.type=so100_tactile_follower \
+  --robot.type=so_tactile_follower \
   --robot.port=/dev/ttyACM0 \
   --robot.id=follower_arm \
   --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -1545,7 +1545,7 @@ lerobot-record \
 # ============================================================
 
 lerobot-record \
-  --robot.type=so100_tactile_follower \
+  --robot.type=so_tactile_follower \
   --robot.port=/dev/ttyACM0 \
   --robot.id=follower_arm \
   --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -1621,7 +1621,7 @@ lerobot-train \
   --policy.repo_id=Tna001/pi05_tactile_expertonly_tube
 
 lerobot-record \
-  --robot.type=so100_tactile_follower \
+  --robot.type=so_tactile_follower \
   --robot.port=/dev/ttyACM0 \
   --robot.id=follower_arm \
   --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -1638,7 +1638,7 @@ lerobot-record \
   --policy.device=cuda
 
 lerobot-record \
-  --robot.type=so100_tactile_follower \
+  --robot.type=so_tactile_follower \
   --robot.port=/dev/ttyACM0 \
   --robot.id=follower_arm \
   --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -1676,7 +1676,7 @@ lerobot-train \
   --peft.r=64    
 
 lerobot-record \
-  --robot.type=so100_tactile_follower \
+  --robot.type=so_tactile_follower \
   --robot.port=/dev/ttyACM0 \
   --robot.id=follower_arm \
   --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -1751,7 +1751,7 @@ lerobot-train \
   --wandb.enable=true
 
 lerobot-record \
-  --robot.type=so100_tactile_follower \
+  --robot.type=so_tactile_follower \
   --robot.port=/dev/ttyACM0 \
   --robot.id=follower_arm \
   --robot.cameras='{camera1: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -1769,7 +1769,7 @@ lerobot-record \
   --policy.device=cuda
 
 lerobot-record \
-  --robot.type=so100_tactile_follower \
+  --robot.type=so_tactile_follower \
   --robot.port=/dev/ttyACM0 \
   --robot.id=follower_arm \
   --robot.cameras='{camera1: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -1785,7 +1785,8 @@ lerobot-record \
   --dataset.fps=10 \
   --dataset.reset_time_s=10 \
   --policy.path=/data/tao/train/smolvla_tactile_tok4/checkpoints/last/pretrained_model \
-  --policy.device=cuda
+  --policy.device=cuda \
+  --resume=true
 
 ## ===== Pi0.5 调参实验 (46GB VRAM) =====
 
@@ -1969,7 +1970,7 @@ lerobot-train \
   --wandb.enable=true
 
 lerobot-record \
-  --robot.type=so100_tactile_follower \
+  --robot.type=so_tactile_follower \
   --robot.port=/dev/ttyACM0 \
   --robot.id=follower_arm \
   --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -2066,50 +2067,6 @@ lerobot-train \
   --wandb.enable=true \
   --wandb.project=lerobot-pens_bag
 
-## ===== Pi0.5 全参数 fine-tune (8xL40S, 8x44.4GB VRAM) =====
-
-# DDP 每卡存完整模型+优化器，全参数 Adam 需 ~44GB 超出 L40S 44.4GB
-# 方案A: FSDP (推荐) — 把 optimizer states 分片到多卡，每卡只存 1/8
-# 方案B: 冻结 vision encoder — 减少训练参数，Adam states 大幅缩小
-# 方案C: DDP + batch_size=1 — 最简单但可能仍然紧张
-
-# ---- 方案A: FSDP FULL_SHARD (推荐, 显存最优) ----
-# FSDP 把参数/梯度/optimizer states 分片到 8 卡
-# 每卡 optimizer states: ~24GB/8 = ~3GB, 显存充裕可用大 batch
-
-# A1: FSDP 全参数微调 (无 tactile)
-PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
-accelerate launch \
-  --use_fsdp \
-  --fsdp_sharding_strategy=FULL_SHARD \
-  --fsdp_auto_wrap_policy=TRANSFORMER_BASED_WRAP \
-  --fsdp_backward_prefetch=BACKWARD_PRE \
-  --fsdp_forward_prefetch=true \
-  --fsdp_state_dict_type=FULL_STATE_DICT \
-  --mixed_precision=bf16 \
-  --num_processes=8 \
-  $(which lerobot-train) \
-  --dataset.repo_id=Tna001/tactile_tube_new \
-  --policy.pretrained_path=lerobot/pi05_base \
-  --policy.type=pi05 \
-  --policy.use_tactile=false \
-  --policy.gradient_checkpointing=true \
-  --policy.dtype=bfloat16 \
-  --policy.freeze_vision_encoder=false \
-  --policy.train_expert_only=false \
-  --policy.optimizer_lr=1e-4 \
-  --policy.scheduler_warmup_steps=500 \
-  --policy.scheduler_decay_steps=15000 \
-  --policy.compile_model=true \
-  --output_dir=/local/robopil/tao/pi05_full_fsdp_8xL40S \
-  --job_name=pi05_full_fsdp_8xL40S \
-  --steps=15000 \
-  --batch_size=5 \
-  --num_workers=16 \
-  --save_freq=5000 \
-  --wandb.enable=true \
-  --policy.repo_id=Tna001/pi05_full_fsdp_8xL40S
-  
 
 srun --account=bgku-delta-gpu --partition=gpuH200x8-interactive --nodes=1 --gpus-per-node=1 --tasks=1 --tasks-per-node=1 --cpus-per-task=16 --mem=200g --time=00:30:00 --pty bash
 
@@ -2166,7 +2123,7 @@ lerobot-train \
   --policy.repo_id=Tna001/pi05_full_ddp_1xH200
 
 lerobot-record \
-  --robot.type=so100_tactile_follower \
+  --robot.type=so_tactile_follower \
   --robot.port=/dev/ttyACM0 \
   --robot.id=follower_arm \
   --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -2185,26 +2142,27 @@ lerobot-record \
   --resume=true
 
 lerobot-record \
-  --robot.type=so100_tactile_follower \
+  --display_data=true \
+  --robot.type=so_tactile_follower \
   --robot.port=/dev/ttyACM0 \
   --robot.id=follower_arm \
   --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
+  --robot.tactile_sensors='{primary: {"port": "/dev/ttyUSB0", "baud_rate": 2000000}}' \
   --teleop.type=so100_leader \
   --teleop.port=/dev/ttyACM1 \
   --teleop.id=leader_arm \
-  --dataset.repo_id=Tna001/eval_pi05_full_5 \
+  --dataset.repo_id=Tna001/eval_pi05_full_tactile_5 \
   --dataset.num_episodes=500 \
   --dataset.episode_time_s=30 \
-  --dataset.single_task="Tube" \
+  --dataset.single_task="Insert the test tube into the tube rack" \
   --dataset.fps=10 \
   --dataset.reset_time_s=10 \
-  --policy.path=/data/tao/050000/pretrained_model \
-  --policy.device=cuda \
-  --resume=true
+  --policy.path=/data/tao/pi05_full_tactile_1xH200_100/checkpoints/050000/pretrained_model \
+  --policy.device=cuda 
 
 # collect more data
 lerobot-record \
-    --robot.type=so100_tactile_follower \
+    --robot.type=so_tactile_follower \
     --robot.port=/dev/ttyACM0 \
     --robot.id=follower_arm \
     --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
@@ -2220,3 +2178,282 @@ lerobot-record \
     --dataset.single_task="Insert the test tube into the tube rack" \
     --dataset.fps=10 \
     --resume=true
+
+lerobot-train \
+  --dataset.repo_id=Tna001/so101_tactile_pens_bag_v1 \
+  --policy.type=act \
+  --policy.use_tactile=true \
+  --policy.tactile_features='["observation.tactile.primary"]' \
+  --policy.n_tactile_tokens=64 \
+  --output_dir=/data/tao/act_tactile_tok64_pens_bag \
+  --job_name=act_tactile_tok64_pens_bag \
+  --batch_size=32 \
+  --num_workers=8 \
+  --policy.device=cuda:0 \
+  --wandb.enable=true \
+  --policy.repo_id=Tna001/act_tactile_tok64_pens_bag
+  --wandb.project=lerobot-pens_bag
+
+lerobot-train \
+  --dataset.repo_id=Tna001/so101_tactile_pens_bag_v1 \
+  --policy.type=act \
+  --policy.use_tactile=true \
+  --policy.tactile_features='["observation.tactile.primary"]' \
+  --policy.n_tactile_tokens=16 \
+  --output_dir=/data/tao/act_tactile_tok16_pens_bag \
+  --job_name=act_tactile_tok16_pens_bag \
+  --batch_size=32 \
+  --num_workers=8 \
+  --policy.device=cuda:0 \
+  --wandb.enable=true \
+  --policy.repo_id=Tna001/act_tactile_tok16_pens_bag
+  --wandb.project=lerobot-pens_bag
+
+lerobot-train \
+  --dataset.repo_id=Tna001/so101_tactile_pens_bag_v1 \
+  --policy.type=act \
+  --policy.chunk_size=50 \
+  --policy.n_action_steps=50 \
+  --policy.use_tactile=true \
+  --policy.tactile_features='["observation.tactile.primary"]' \
+  --policy.n_tactile_tokens=8 \
+  --output_dir=/local/robopil/tao/act_tactile_tok8_pens_bag_50 \
+  --job_name=act_tactile_tok8_pens_bag_50 \
+  --batch_size=32 \
+  --num_workers=8 \
+  --policy.device=cuda:0 \
+  --wandb.enable=true \
+  --policy.repo_id=Tna001/act_tactile_tok8_pens_bag_50 \
+  --wandb.project=lerobot-pens_bag
+
+lerobot-train \
+  --dataset.repo_id=Tna001/so101_tactile_pens_bag_v1 \
+  --policy.type=act \
+  --policy.use_tactile=true \
+  --policy.tactile_features='["observation.tactile.primary"]' \
+  --policy.n_tactile_tokens=16 \
+  --output_dir=/local/robopil/tao/act_tactile_tok16_pens_bag_50 \
+  --job_name=act_tactile_tok16_pens_bag_50 \
+  --batch_size=32 \
+  --num_workers=8 \
+  --policy.device=cuda:0 \
+  --wandb.enable=true \
+  --policy.repo_id=Tna001/act_tactile_tok16_pens_bag_50 \
+  --wandb.project=lerobot-pens_bag
+
+lerobot-record \
+  --robot.type=so_tactile_follower \
+  --robot.port=/dev/ttyACM0 \
+  --robot.id=follower_arm \
+  --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
+  --teleop.type=so100_leader \
+  --teleop.port=/dev/ttyACM1 \
+  --teleop.id=leader_arm \
+  --dataset.repo_id=Tna001/eval_pi05_full_new \
+  --dataset.num_episodes=500 \
+  --dataset.episode_time_s=30 \
+  --dataset.single_task="Tube" \
+  --dataset.fps=10 \
+  --dataset.reset_time_s=10 \
+  --policy.path=/data/wesley/pi0.5_checkpoints/pi05_tactile/pretrained_model \
+  --policy.device=cuda
+
+# ============================================================
+# Apr 5 train
+# ============================================================
+1. SmolVLA baseline                                                           
+                                                                                                        
+lerobot-train \
+  --policy.path=lerobot/smolvla_base \
+  --dataset.repo_id=Tna001/so101_tactile_pens_bag_v1 \
+  --rename_map='{"observation.images.top": "observation.images.camera1"}' \
+  --policy.empty_cameras=2 \
+  --policy.use_tactile=false \
+  --policy.frame_stride=3 \
+  --batch_size=64 \
+  --steps=40000 \
+  --output_dir=/local/robopil/tao/smolvla_pens_baseline_10hz \
+  --job_name=smolvla_pens_baseline_10hz \
+  --policy.device=cuda \
+  --policy.repo_id=Tna001/smolvla_pens_baseline_10hz \
+  --wandb.enable=true
+
+2. SmolVLA + Tactile, 4 tokens
+
+lerobot-train \
+  --policy.path=lerobot/smolvla_base \
+  --dataset.repo_id=Tna001/so101_tactile_pens_bag_v1 \
+  --rename_map='{"observation.images.top": "observation.images.camera1"}' \
+  --policy.empty_cameras=2 \
+  --policy.use_tactile=true \
+  --policy.tactile_features='["observation.tactile.primary"]' \
+  --policy.n_tactile_tokens=4 \
+  --policy.tactile_feature_dim=256 \
+  --policy.frame_stride=3 \
+  --batch_size=64 \
+  --steps=40000 \
+  --output_dir=/local/robopil/tao/smolvla_tactile_tok4_pens_10hz \
+  --job_name=smolvla_tactile_tok4_pens_10hz \
+  --policy.device=cuda \
+  --policy.repo_id=Tna001/smolvla_tactile_tok4_pens_10hz \
+  --wandb.enable=true
+
+  
+  --dataset.single_task="Grab the pen from the bag and place it in the basket next to it" \
+  /projects/bgku/ntao/checkpoints/pi05_full_ddp_1xH200/checkpoints
+
+lerobot-record \
+  --display_data=true \
+  --robot.type=so_tactile_follower \
+  --robot.port=/dev/ttyACM0 \
+  --robot.id=follower_arm \
+  --robot.cameras='{camera1: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
+  --robot.tactile_sensors='{primary: {"port": "/dev/ttyUSB0", "baud_rate": 2000000}}' \
+  --policy.empty_cameras=2 \
+  --teleop.type=so100_leader \
+  --teleop.port=/dev/ttyACM1 \
+  --teleop.id=leader_arm \
+  --dataset.repo_id=Tna001/eval_smovla_tactile \
+  --dataset.num_episodes=40 \
+  --dataset.episode_time_s=30 \
+  --dataset.single_task="Insert the test tube into the tube rack" \
+  --dataset.fps=10 \
+  --dataset.reset_time_s=10 \
+  --policy.path=/data/tao/train/smolvla_tactile_tok4/checkpoints/last/pretrained_model \
+  --policy.device=cuda \
+  --resume=true
+
+lerobot-record \
+  --display_data=true \
+  --robot.type=so_tactile_follower \
+  --robot.port=/dev/ttyACM0 \
+  --robot.id=follower_arm \
+  --robot.cameras='{camera1: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
+  --policy.empty_cameras=2 \
+  --teleop.type=so100_leader \
+  --teleop.port=/dev/ttyACM1 \
+  --teleop.id=leader_arm \
+  --dataset.repo_id=Tna001/eval_smovla \
+  --dataset.num_episodes=40 \
+  --dataset.episode_time_s=30 \
+  --dataset.single_task="Insert the test tube into the tube rack" \
+  --dataset.fps=10 \
+  --dataset.reset_time_s=10 \
+  --policy.path=/data/tao/train/smolvla_tube_baseline/checkpoints/last/pretrained_model \
+  --policy.device=cuda \
+  --resume=true
+
+lerobot-record \
+  --display_data=true \
+  --robot.type=so_tactile_follower \
+  --robot.port=/dev/ttyACM0 \
+  --robot.id=follower_arm \
+  --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
+  --teleop.type=so100_leader \
+  --teleop.port=/dev/ttyACM1 \
+  --teleop.id=leader_arm \
+  --dataset.repo_id=Tna001/eval_pi05_full \
+  --dataset.num_episodes=500 \
+  --dataset.episode_time_s=50 \
+  --dataset.single_task="Insert the test tube into the tube rack" \
+  --dataset.fps=5 \
+  --dataset.reset_time_s=10 \
+  --policy.path=/data/tao/pi05_full_ddp_1xH200/checkpoints/050000/pretrained_model \
+  --policy.device=cuda \
+  --resume=true
+
+lerobot-record \
+  --robot.type=so_tactile_follower \
+  --robot.port=/dev/ttyACM0 \
+  --robot.id=follower_arm \
+  --robot.cameras='{top: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
+  --robot.tactile_sensors='{primary: {"port": "/dev/ttyUSB0", "baud_rate": 2000000}}' \
+  --teleop.type=so100_leader \
+  --teleop.port=/dev/ttyACM1 \
+  --teleop.id=leader_arm \
+  --display_data=true \
+  --dataset.repo_id=Tna001/tactile_peg_hole_new \
+  --dataset.fps=10 \
+  --dataset.num_episodes=100 \
+  --dataset.episode_time_s=30 \
+  --dataset.reset_time_s=5 \
+  --dataset.single_task="Peg in hole" \
+  --dataset.push_to_hub=True
+
+# ============================================================
+# Apr 12 train
+# ============================================================
+1. SmolVLA baseline                                                           
+                                                                                                        
+lerobot-train \
+  --policy.path=lerobot/smolvla_base \
+  --dataset.repo_id=Tna001/tactile_peg_hole_new \
+  --rename_map='{"observation.images.top": "observation.images.camera1"}' \
+  --policy.empty_cameras=2 \
+  --policy.use_tactile=false \
+  --batch_size=64 \
+  --steps=40000 \
+  --output_dir=/local/robopil/tao/smolvla_peg_and_hole \
+  --job_name=smolvla_peg_baseline_10hz \
+  --policy.device=cuda \
+  --policy.repo_id=Tna001/smolvla_peg_baseline_10hz \
+  --wandb.enable=true
+
+2. SmolVLA + Tactile, 4 tokens
+
+lerobot-train \
+  --policy.path=lerobot/smolvla_base \
+  --dataset.repo_id=Tna001/tactile_peg_hole_new \
+  --rename_map='{"observation.images.top": "observation.images.camera1"}' \
+  --policy.empty_cameras=2 \
+  --policy.use_tactile=true \
+  --policy.tactile_features='["observation.tactile.primary"]' \
+  --policy.n_tactile_tokens=4 \
+  --policy.tactile_feature_dim=256 \
+  --batch_size=64 \
+  --steps=40000 \
+  --output_dir=/local/robopil/tao/smolvla_tactile_tok4_peg_10hz \
+  --job_name=smolvla_tactile_tok4_peg_10hz \
+  --policy.device=cuda \
+  --policy.repo_id=Tna001/smolvla_tactile_tok4_peg_10hz \
+  --wandb.enable=true
+
+lerobot-record \
+  --display_data=true \
+  --robot.type=so_tactile_follower \
+  --robot.port=/dev/ttyACM0 \
+  --robot.id=follower_arm \
+  --robot.cameras='{camera1: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
+  --robot.tactile_sensors='{primary: {"port": "/dev/ttyUSB0", "baud_rate": 2000000}}' \
+  --policy.empty_cameras=2 \
+  --teleop.type=so100_leader \
+  --teleop.port=/dev/ttyACM1 \
+  --teleop.id=leader_arm \
+  --dataset.repo_id=Tna001/eval_smovla_tactile_peg \
+  --dataset.num_episodes=400 \
+  --dataset.episode_time_s=3000 \
+  --dataset.single_task="Peg in hole" \
+  --dataset.fps=10 \
+  --dataset.reset_time_s=10 \
+  --policy.path=/data/tao/smolvla_tactile_tok4_peg_10hz/checkpoints/last/pretrained_model \
+  --policy.device=cuda \
+  --resume=true
+
+lerobot-record \
+  --display_data=true \
+  --robot.type=so_tactile_follower \
+  --robot.port=/dev/ttyACM0 \
+  --robot.id=follower_arm \
+  --robot.cameras='{camera1: {"type": "intelrealsense", "serial_number_or_name":"239222300740", "width":640, "height":480, "target_width":224, "target_height":224, "fps":30}}' \
+  --policy.empty_cameras=2 \
+  --teleop.type=so100_leader \
+  --teleop.port=/dev/ttyACM1 \
+  --teleop.id=leader_arm \
+  --dataset.repo_id=Tna001/eval_smovla_peg \
+  --dataset.num_episodes=400 \
+  --dataset.episode_time_s=3000 \
+  --dataset.single_task="Peg in hole" \
+  --dataset.fps=10 \
+  --dataset.reset_time_s=10 \
+  --policy.path=/data/tao/smolvla_peg_and_hole/checkpoints/last/pretrained_model \
+  --policy.device=cuda

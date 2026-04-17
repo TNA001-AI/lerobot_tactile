@@ -45,26 +45,25 @@ def _visualization_worker(queue: mp.Queue, window_name: str, shape: tuple):
 
 
 class TactileSensor:
-    """Interface for 16x32 tactile sensor array via USB serial communication"""
+    """Interface for 12x32 tactile sensor array via USB serial communication"""
 
     # Binary protocol constants
     MAGIC = b"\xAA\x55"
-    ROWS, COLS = 16, 32
-    FRAME_BYTES = ROWS * COLS  # 512
+    ROWS, COLS = 12, 32
+    FRAME_BYTES = ROWS * COLS  # 384
 
     def __init__(
         self,
         port: str = "/dev/ttyUSB0",
         baud_rate: int = 2000000,
         timeout: float = 0.01,
-        shape: tuple[int, int] = (16, 32),
+        shape: tuple[int, int] = (12, 32),
         auto_calibrate: bool = True,
         enable_visualization: bool = True,
         window_name: str = "Tactile Sensor",
         threshold: float = 25.0,
         noise_scale: float = 30.0,
         temporal_alpha: float = 0.2,
-        display_rows: int = 12,
     ):
         """
         Initialize tactile sensor interface
@@ -80,8 +79,6 @@ class TactileSensor:
             threshold: Threshold for contact detection
             noise_scale: Scale factor for normalizing low-pressure readings
             temporal_alpha: Blending factor for temporal smoothing (0-1)
-            display_rows: Number of rows to show in the visualization window.
-                Set to 12 to hide the 4 silent rows at the top of a 16x32 sensor.
         """
         self.port = port
         self.baud_rate = baud_rate
@@ -109,7 +106,6 @@ class TactileSensor:
         self.threshold = threshold
         self.noise_scale = noise_scale
         self.temporal_alpha = temporal_alpha
-        self.display_rows = min(display_rows, self.ROWS)
         self._prev_frame: Optional[np.ndarray] = None
         self._viz_queue: Optional[mp.Queue] = None
         self._viz_process: Optional[mp.Process] = None
@@ -294,7 +290,6 @@ class TactileSensor:
             logging.warning("Sensor not calibrated, returning raw data")
             return raw_data.astype(np.float32)
 
-        # Subtract baseline and threshold, then clip (matching fast-32-16.py line 164)
         processed_data = raw_data.astype(np.float32) - self.baseline - self.threshold
         processed_data = np.clip(processed_data, 0, 100)
 
@@ -338,14 +333,13 @@ class TactileSensor:
     def _init_visualization(self):
         """Launch a subprocess to display the tactile visualization window."""
         self._viz_queue = mp.Queue(maxsize=2)
-        display_shape = (self.display_rows, self.shape[1])
         self._viz_process = mp.Process(
             target=_visualization_worker,
-            args=(self._viz_queue, self.window_name, display_shape),
+            args=(self._viz_queue, self.window_name, self.shape),
             daemon=True,
         )
         self._viz_process.start()
-        self._prev_frame = np.zeros(display_shape, dtype=np.float32)
+        self._prev_frame = np.zeros(self.shape, dtype=np.float32)
         self._visualization_initialized = True
         logging.info(f"Visualization process started for '{self.window_name}'")
 
@@ -408,9 +402,6 @@ class TactileSensor:
 
         if data is None:
             return False
-
-        # Crop to display_rows before visualization (hides silent rows at the top)
-        data = data[-self.display_rows:, :]
 
         # Normalize the data
         normalized = self._normalize_data(data)

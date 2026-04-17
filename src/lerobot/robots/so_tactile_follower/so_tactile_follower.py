@@ -20,20 +20,20 @@ from typing import Any
 import numpy as np
 
 from lerobot.configs.types import FeatureType, PolicyFeature
-from lerobot.robots.so_follower.so_follower import SO100Follower
+from lerobot.robots.so_follower.so_follower import SOFollower
 from lerobot.sensors.tactile_sensor import TactileSensor
 from lerobot.utils.constants import OBS_TACTILE
 
-from .config_so100_tactile_follower import SO100TactileFollowerConfig
+from .config_so_tactile_follower import SOTactileFollowerConfig
 
 
-class SO100TactileFollower(SO100Follower):
-    """SO100 Follower robot with tactile sensor support."""
+class SOTactileFollower(SOFollower):
+    """SO Follower robot (SO-100/101/10X) with tactile sensor support."""
 
-    config_class = SO100TactileFollowerConfig
-    name = "so100_tactile_follower"
+    config_class = SOTactileFollowerConfig
+    name = "so_tactile_follower"
 
-    def __init__(self, config: SO100TactileFollowerConfig):
+    def __init__(self, config: SOTactileFollowerConfig):
         super().__init__(config)
 
         self._tactile_sensors: dict[str, TactileSensor] = {}

@@ -18,15 +18,15 @@ import draccus
 
 from lerobot.configs.train import TrainPipelineConfig
 from lerobot.policies.act.configuration_act import ACTConfig
-from lerobot.robots.so100_tactile_follower import SO100TactileFollowerConfig
+from lerobot.robots.so_tactile_follower import SOTactileFollowerConfig
 from lerobot.scripts.lerobot_record import RecordConfig
 
 
-def test_record_cli_parses_so100_tactile_follower():
+def test_record_cli_parses_so_tactile_follower():
     cfg = draccus.parse(
         RecordConfig,
         args=[
-            "--robot.type=so100_tactile_follower",
+            "--robot.type=so_tactile_follower",
             "--robot.port=/dev/null",
             '--robot.tactile_sensors={"primary": {"port": "/dev/ttyUSB0"}}',
             "--dataset.repo_id=test/tactile",
@@ -36,8 +36,8 @@ def test_record_cli_parses_so100_tactile_follower():
         ],
     )
 
-    assert isinstance(cfg.robot, SO100TactileFollowerConfig)
-    assert cfg.robot.type == "so100_tactile_follower"
+    assert isinstance(cfg.robot, SOTactileFollowerConfig)
+    assert cfg.robot.type == "so_tactile_follower"
     assert "primary" in cfg.robot.tactile_sensors
     assert cfg.robot.tactile_sensors["primary"].port == "/dev/ttyUSB0"
     assert cfg.teleop is not None
@@ -48,7 +48,7 @@ def test_record_cli_parses_dual_tactile_sensors():
     cfg = draccus.parse(
         RecordConfig,
         args=[
-            "--robot.type=so100_tactile_follower",
+            "--robot.type=so_tactile_follower",
             "--robot.port=/dev/null",
             '--robot.tactile_sensors={"left": {"port": "/dev/ttyUSB0"}, "right": {"port": "/dev/ttyUSB1"}}',
             "--dataset.repo_id=test/tactile",
@@ -58,7 +58,7 @@ def test_record_cli_parses_dual_tactile_sensors():
         ],
     )
 
-    assert isinstance(cfg.robot, SO100TactileFollowerConfig)
+    assert isinstance(cfg.robot, SOTactileFollowerConfig)
     assert set(cfg.robot.tactile_sensors.keys()) == {"left", "right"}
     assert cfg.robot.tactile_sensors["left"].port == "/dev/ttyUSB0"
     assert cfg.robot.tactile_sensors["right"].port == "/dev/ttyUSB1"
