@@ -53,7 +53,6 @@ class TactileSensor:
         threshold: float = 25.0,
         noise_scale: float = 30.0,
         temporal_alpha: float = 0.2,
-        display_rows: int = 12,
     ):
         """Initialize tactile sensor.
 
@@ -70,7 +69,6 @@ class TactileSensor:
             threshold: Contact-detection threshold (ADC counts above baseline).
             noise_scale: Divisor used to normalize sub-threshold readings.
             temporal_alpha: EMA blending factor for smoothing the viz (0-1).
-            display_rows: Number of trailing rows to show in the viz window.
         """
         self.port = port
         self.baud_rate = baud_rate
@@ -99,7 +97,6 @@ class TactileSensor:
         self.enable_visualization = enable_visualization
         self.window_name = window_name
         self.temporal_alpha = temporal_alpha
-        self.display_rows = min(display_rows, self.rows)
         self._prev_frame: Optional[np.ndarray] = None
         self._viz_queue: Optional[mp.Queue] = None
         self._viz_process: Optional[mp.Process] = None
@@ -177,14 +174,6 @@ class TactileSensor:
             logging.error(f"Calibration failed: {e}")
             return False
 
-    def read_raw_data(self) -> Optional[np.ndarray]:
-        try:
-            frame = self._sensor.read_latest()
-            return frame.raw.astype(np.float32)
-        except Exception as e:
-            logging.warning(f"Read error: {e}")
-            return None
-
     def read_data(self) -> Optional[np.ndarray]:
         """Read normalized tactile data (0-1 range) from the sensor."""
         try:
@@ -225,7 +214,7 @@ class TactileSensor:
 
     def _init_visualization(self):
         self._viz_queue = mp.Queue(maxsize=2)
-        display_shape = (self.display_rows, self.cols)
+        display_shape = (self.rows, self.cols)
         self._viz_process = mp.Process(
             target=_visualization_worker,
             args=(self._viz_queue, self.window_name, display_shape),
@@ -253,7 +242,6 @@ class TactileSensor:
         if data is None:
             return False
 
-        data = data[-self.display_rows:, :]
         filtered = self._temporal_filter(data)
         scaled = (filtered * 255).astype(np.uint8)
         colormap = cv2.applyColorMap(scaled, cv2.COLORMAP_VIRIDIS)
