@@ -253,7 +253,7 @@ def train(cfg: TrainPipelineConfig, accelerator: Accelerator | None = None):
     accelerator.wait_for_everyone()
 
     # Create processors - only provide dataset_stats if not resuming from saved processors
-    processor_kwargs = {}
+    processor_kwargs = {"rename_map": cfg.rename_map}
     postprocessor_kwargs = {}
     if (cfg.policy.pretrained_path and not cfg.resume) or not cfg.policy.pretrained_path:
         # Only provide dataset_stats when not resuming from saved processor state

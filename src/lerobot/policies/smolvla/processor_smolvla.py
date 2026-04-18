@@ -39,6 +39,7 @@ from lerobot.utils.constants import POLICY_POSTPROCESSOR_DEFAULT_NAME, POLICY_PR
 def make_smolvla_pre_post_processors(
     config: SmolVLAConfig,
     dataset_stats: dict[str, dict[str, torch.Tensor]] | None = None,
+    rename_map: dict[str, str] | None = None,
 ) -> tuple[
     PolicyProcessorPipeline[dict[str, Any], dict[str, Any]],
     PolicyProcessorPipeline[PolicyAction, PolicyAction],
@@ -61,13 +62,14 @@ def make_smolvla_pre_post_processors(
     Args:
         config: The configuration object for the SmolVLA policy.
         dataset_stats: A dictionary of statistics for normalization.
+        rename_map: Optional mapping of dataset observation keys to policy-expected keys.
 
     Returns:
         A tuple containing the configured pre-processor and post-processor pipelines.
     """
 
     input_steps = [
-        RenameObservationsProcessorStep(rename_map={}),  # To mimic the same processor as pretrained one
+        RenameObservationsProcessorStep(rename_map=rename_map or {}),
         AddBatchDimensionProcessorStep(),
         SmolVLANewLineProcessor(),
         TokenizerProcessorStep(
