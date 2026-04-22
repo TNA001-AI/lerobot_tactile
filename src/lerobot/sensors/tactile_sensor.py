@@ -39,7 +39,8 @@ def _visualization_worker(queue: mp.Queue, window_name: str, shape: tuple):
             continue
         if frame is None:
             break
-        cv2.imshow(window_name, frame)
+        display = cv2.resize(frame, (window_width, window_height), interpolation=cv2.INTER_NEAREST)
+        cv2.imshow(window_name, display)
         cv2.waitKey(1)
     cv2.destroyAllWindows()
 
@@ -63,7 +64,7 @@ class TactileSensor:
         window_name: str = "Tactile Sensor",
         threshold: float = 25.0,
         noise_scale: float = 30.0,
-        temporal_alpha: float = 0.2,
+        temporal_alpha: float = 0.6,
     ):
         """
         Initialize tactile sensor interface
@@ -239,8 +240,22 @@ class TactileSensor:
                         continue
                     self._frame_buffer[have:] = rest
 
-                # Convert to numpy array and return
+                # Convert to numpy array
                 frame = np.frombuffer(self._frame_buffer, dtype=np.uint8).reshape((self.ROWS, self.COLS)).astype(np.float32)
+
+                # Drain remaining complete frames so we always return the LATEST
+                while True:
+                    idx2 = self._ring_buffer.find(self.MAGIC)
+                    if idx2 < 0 or idx2 + 2 + self.FRAME_BYTES > len(self._ring_buffer):
+                        break
+                    del self._ring_buffer[:idx2 + 2]
+                    if len(self._ring_buffer) >= self.FRAME_BYTES:
+                        self._frame_buffer[:] = self._ring_buffer[:self.FRAME_BYTES]
+                        del self._ring_buffer[:self.FRAME_BYTES]
+                        frame = np.frombuffer(self._frame_buffer, dtype=np.uint8).reshape((self.ROWS, self.COLS)).astype(np.float32)
+                    else:
+                        break
+
                 return frame
 
         except serial.SerialException as e:
