@@ -192,6 +192,13 @@ class TactileSensor:
             return None
 
         try:
+            # Drain the OS serial buffer so _ring_buffer reflects everything
+            # that has arrived up to now, not just one 8192-byte chunk.
+            if self.serial_conn.in_waiting:
+                self._ring_buffer.extend(
+                    self.serial_conn.read(self.serial_conn.in_waiting)
+                )
+
             # Read chunks and search for magic header
             while True:
                 # Read available data
@@ -239,8 +246,20 @@ class TactileSensor:
                         continue
                     self._frame_buffer[have:] = rest
 
-                # Convert to numpy array and return
+                # Convert to numpy array
                 frame = np.frombuffer(self._frame_buffer, dtype=np.uint8).reshape((self.ROWS, self.COLS)).astype(np.float32)
+
+                # Drain any remaining complete frames in the ring buffer so we
+                # always return the LATEST frame, not the oldest one queued up.
+                while True:
+                    idx2 = self._ring_buffer.find(self.MAGIC)
+                    if idx2 < 0 or idx2 + 2 + self.FRAME_BYTES > len(self._ring_buffer):
+                        break
+                    del self._ring_buffer[:idx2 + 2]
+                    self._frame_buffer[:] = self._ring_buffer[:self.FRAME_BYTES]
+                    del self._ring_buffer[:self.FRAME_BYTES]
+                    frame = np.frombuffer(self._frame_buffer, dtype=np.uint8).reshape((self.ROWS, self.COLS)).astype(np.float32)
+
                 return frame
 
         except serial.SerialException as e:
