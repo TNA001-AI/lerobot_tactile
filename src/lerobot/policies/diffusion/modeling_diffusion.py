@@ -35,13 +35,14 @@ from torch import Tensor, nn
 
 from lerobot.policies.diffusion.configuration_diffusion import DiffusionConfig
 from lerobot.policies.pretrained import PreTrainedPolicy
+from lerobot.policies.tactile.encoder import TactileTokenEncoder
 from lerobot.policies.utils import (
     get_device_from_parameters,
     get_dtype_from_parameters,
     get_output_shape,
     populate_queues,
 )
-from lerobot.utils.constants import ACTION, OBS_ENV_STATE, OBS_IMAGES, OBS_STATE
+from lerobot.utils.constants import ACTION, OBS_ENV_STATE, OBS_IMAGES, OBS_STATE, OBS_TACTILE
 
 
 class DiffusionPolicy(PreTrainedPolicy):
@@ -82,13 +83,18 @@ class DiffusionPolicy(PreTrainedPolicy):
     def reset(self):
         """Clear observation and action queues. Should be called on `env.reset()`"""
         self._queues = {
-            OBS_STATE: deque(maxlen=self.config.n_obs_steps),
             ACTION: deque(maxlen=self.config.n_action_steps),
         }
+        if self.config.robot_state_feature:
+            self._queues[OBS_STATE] = deque(maxlen=self.config.n_obs_steps)
         if self.config.image_features:
             self._queues[OBS_IMAGES] = deque(maxlen=self.config.n_obs_steps)
         if self.config.env_state_feature:
             self._queues[OBS_ENV_STATE] = deque(maxlen=self.config.n_obs_steps)
+        if self.config.use_tactile:
+            tactile_keys = self.config.tactile_features if self.config.tactile_features else [OBS_TACTILE]
+            for key in tactile_keys:
+                self._queues[key] = deque(maxlen=self.config.n_obs_steps)
 
     @torch.no_grad()
     def predict_action_chunk(self, batch: dict[str, Tensor], noise: Tensor | None = None) -> Tensor:
@@ -170,7 +176,7 @@ class DiffusionModel(nn.Module):
         self.config = config
 
         # Build observation encoders (depending on which observations are provided).
-        global_cond_dim = self.config.robot_state_feature.shape[0]
+        global_cond_dim = self.config.robot_state_feature.shape[0] if self.config.robot_state_feature else 0
         if self.config.image_features:
             num_images = len(self.config.image_features)
             if self.config.use_separate_rgb_encoder_per_camera:
@@ -182,6 +188,16 @@ class DiffusionModel(nn.Module):
                 global_cond_dim += self.rgb_encoder.feature_dim * num_images
         if self.config.env_state_feature:
             global_cond_dim += self.config.env_state_feature.shape[0]
+        if self.config.use_tactile:
+            n_sensors = len(self.config.tactile_features) if self.config.tactile_features else 1
+            self.tactile_encoder = TactileTokenEncoder(
+                encoder_type=config.tactile_encoder_type,
+                input_shape=config.tactile_input_shape,
+                feature_dim=config.tactile_feature_dim,
+                n_tokens=config.n_tactile_chunks,
+                dropout=config.tactile_dropout,
+            )
+            global_cond_dim += n_sensors * config.n_tactile_chunks * config.tactile_feature_dim
 
         self.unet = DiffusionConditionalUnet1d(config, global_cond_dim=global_cond_dim * config.n_obs_steps)
 
@@ -245,8 +261,14 @@ class DiffusionModel(nn.Module):
 
     def _prepare_global_conditioning(self, batch: dict[str, Tensor]) -> Tensor:
         """Encode image features and concatenate them all together along with the state vector."""
-        batch_size, n_obs_steps = batch[OBS_STATE].shape[:2]
-        global_cond_feats = [batch[OBS_STATE]]
+        if self.config.robot_state_feature:
+            batch_size, n_obs_steps = batch[OBS_STATE].shape[:2]
+            global_cond_feats = [batch[OBS_STATE]]
+        elif self.config.image_features:
+            batch_size, n_obs_steps = batch[OBS_IMAGES].shape[:2]
+            global_cond_feats = []
+        else:
+            raise ValueError("At least one of robot_state_feature or image_features must be provided.")
         # Extract image features.
         if self.config.image_features:
             if self.config.use_separate_rgb_encoder_per_camera:
@@ -278,6 +300,20 @@ class DiffusionModel(nn.Module):
         if self.config.env_state_feature:
             global_cond_feats.append(batch[OBS_ENV_STATE])
 
+        # Tactile features: encode each sensor and flatten tokens into the feature vector.
+        if self.config.use_tactile:
+            tactile_keys = self.config.tactile_features if self.config.tactile_features else [OBS_TACTILE]
+            for tactile_key in tactile_keys:
+                # batch[tactile_key]: (B, n_obs_steps, H, W)
+                tactile_data = batch[tactile_key]
+                bs, n_obs = tactile_data.shape[:2]
+                # Encode each obs step: merge batch & time dims
+                tactile_flat = tactile_data.flatten(0, 1)  # (B*n_obs, H, W)
+                chunks = self.tactile_encoder(tactile_flat)  # (B*n_obs, n_chunks, feat_dim)
+                chunks = chunks.flatten(1)  # (B*n_obs, n_chunks*feat_dim)
+                chunks = chunks.view(bs, n_obs, -1)  # (B, n_obs, n_chunks*feat_dim)
+                global_cond_feats.append(chunks)
+
         # Concatenate features then flatten to (B, global_cond_dim).
         return torch.cat(global_cond_feats, dim=-1).flatten(start_dim=1)
 
@@ -292,7 +328,10 @@ class DiffusionModel(nn.Module):
             "observation.environment_state": (B, n_obs_steps, environment_dim)
         }
         """
-        batch_size, n_obs_steps = batch[OBS_STATE].shape[:2]
+        if self.config.robot_state_feature:
+            batch_size, n_obs_steps = batch[OBS_STATE].shape[:2]
+        else:
+            batch_size, n_obs_steps = batch[OBS_IMAGES].shape[:2]
         assert n_obs_steps == self.config.n_obs_steps
 
         # Encode image features and concatenate them all together along with the state vector.
@@ -323,9 +362,9 @@ class DiffusionModel(nn.Module):
         }
         """
         # Input validation.
-        assert set(batch).issuperset({OBS_STATE, ACTION, "action_is_pad"})
-        assert OBS_IMAGES in batch or OBS_ENV_STATE in batch
-        n_obs_steps = batch[OBS_STATE].shape[1]
+        assert set(batch).issuperset({ACTION, "action_is_pad"})
+        assert OBS_IMAGES in batch or OBS_ENV_STATE in batch or OBS_STATE in batch
+        n_obs_steps = batch[OBS_STATE].shape[1] if OBS_STATE in batch else batch[OBS_IMAGES].shape[1]
         horizon = batch[ACTION].shape[1]
         assert horizon == self.config.horizon
         assert n_obs_steps == self.config.n_obs_steps

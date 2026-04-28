@@ -31,12 +31,16 @@ class SmolVLAConfig(PreTrainedConfig):
     n_obs_steps: int = 1
     chunk_size: int = 50
     n_action_steps: int = 50
+    # Frame stride for subsampling dataset frames. Set to 3 to train at 10Hz on 30Hz data.
+    frame_stride: int = 1
+    drop_n_last_frames: int = 0  # (chunk_size - n_action_steps) * frame_stride
 
     normalization_mapping: dict[str, NormalizationMode] = field(
         default_factory=lambda: {
             "VISUAL": NormalizationMode.IDENTITY,
             "STATE": NormalizationMode.MEAN_STD,
             "ACTION": NormalizationMode.MEAN_STD,
+            "TACTILE": NormalizationMode.MEAN_STD,
         }
     )
 
@@ -106,11 +110,27 @@ class SmolVLAConfig(PreTrainedConfig):
     # Real-Time Chunking (RTC) configuration
     rtc_config: RTCConfig | None = None
 
+    # Tactile sensor configuration
+    use_tactile: bool = False
+    tactile_encoder_type: str = "cnn"  # choices: ["cnn", "attention"]
+    tactile_input_shape: tuple[int, int] = (12, 32)
+    tactile_dropout: float = 0.3
+    tactile_feature_dim: int = 256  # internal CNN output dim before projection to VLM hidden size
+    # Named tactile sensor keys when using multiple sensors.
+    # e.g., ["observation.tactile.left", "observation.tactile.right"]
+    # Leave as None for single sensor mode (uses "observation.tactile" key).
+    tactile_features: list[str] | None = None
+    # Number of prefix tokens each tactile sensor is encoded into.
+    n_tactile_tokens: int = 1
+
     compile_model: bool = False  # Whether to use torch.compile for model optimization
     compile_mode: str = "max-autotune"  # Torch compile mode
 
     def __post_init__(self):
         super().__post_init__()
+
+        # Update drop_n_last_frames to account for frame_stride.
+        self.drop_n_last_frames = (self.chunk_size - self.n_action_steps) * self.frame_stride
 
         """Input validation (not exhaustive)."""
         if self.n_action_steps > self.chunk_size:
@@ -121,6 +141,11 @@ class SmolVLAConfig(PreTrainedConfig):
         if self.use_delta_joint_actions_aloha:
             raise NotImplementedError(
                 "`use_delta_joint_actions_aloha` is used by smolvla for aloha real models. It is not ported yet in LeRobot."
+            )
+        if self.use_tactile and self.tactile_encoder_type not in ["cnn", "attention"]:
+            raise ValueError(
+                f"Invalid tactile encoder type. Got {self.tactile_encoder_type}, "
+                f"expected one of ['cnn', 'attention']"
             )
 
     def validate_features(self) -> None:
@@ -155,7 +180,7 @@ class SmolVLAConfig(PreTrainedConfig):
 
     @property
     def action_delta_indices(self) -> list:
-        return list(range(self.chunk_size))
+        return [i * self.frame_stride for i in range(self.chunk_size)]
 
     @property
     def reward_delta_indices(self) -> None:

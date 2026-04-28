@@ -64,10 +64,17 @@ from lerobot.policies.pretrained import PreTrainedPolicy
 from lerobot.policies.rtc.modeling_rtc import RTCProcessor
 from lerobot.policies.smolvla.configuration_smolvla import SmolVLAConfig
 from lerobot.policies.smolvla.smolvlm_with_expert import SmolVLMWithExpertModel
+from lerobot.policies.tactile.encoder import TactileTokenEncoder
 from lerobot.policies.utils import (
     populate_queues,
 )
-from lerobot.utils.constants import ACTION, OBS_LANGUAGE_ATTENTION_MASK, OBS_LANGUAGE_TOKENS, OBS_STATE
+from lerobot.utils.constants import (
+    ACTION,
+    OBS_LANGUAGE_ATTENTION_MASK,
+    OBS_LANGUAGE_TOKENS,
+    OBS_STATE,
+    OBS_TACTILE,
+)
 from lerobot.utils.device_utils import get_safe_dtype
 
 
@@ -286,9 +293,17 @@ class SmolVLAPolicy(PreTrainedPolicy):
         state = self.prepare_state(batch)
         lang_tokens = batch[f"{OBS_LANGUAGE_TOKENS}"]
         lang_masks = batch[f"{OBS_LANGUAGE_ATTENTION_MASK}"]
+        tactile_data = self._extract_tactile_data(batch)
 
         actions = self.model.sample_actions(
-            images, img_masks, lang_tokens, lang_masks, state, noise=noise, **kwargs
+            images,
+            img_masks,
+            lang_tokens,
+            lang_masks,
+            state,
+            noise=noise,
+            tactile_data=tactile_data,
+            **kwargs,
         )
 
         # Unpad actions
@@ -373,10 +388,13 @@ class SmolVLAPolicy(PreTrainedPolicy):
         state = self.prepare_state(batch)
         lang_tokens = batch[f"{OBS_LANGUAGE_TOKENS}"]
         lang_masks = batch[f"{OBS_LANGUAGE_ATTENTION_MASK}"]
+        tactile_data = self._extract_tactile_data(batch)
         actions = self.prepare_action(batch)
         actions_is_pad = batch.get("action_is_pad")
         loss_dict = {}
-        losses = self.model.forward(images, img_masks, lang_tokens, lang_masks, state, actions, noise, time)
+        losses = self.model.forward(
+            images, img_masks, lang_tokens, lang_masks, state, actions, noise, time, tactile_data=tactile_data
+        )
         original_action_dim = self.config.action_feature.shape[0]
         losses = losses[:, :, :original_action_dim]
         loss_dict["losses_after_forward"] = losses.clone().mean().item()
@@ -469,6 +487,13 @@ class SmolVLAPolicy(PreTrainedPolicy):
         for motor_idx in [6, 13]:
             actions[:, :, motor_idx] = aloha_gripper_from_angular_inv(actions[:, :, motor_idx])
         return actions
+
+    def _extract_tactile_data(self, batch: dict[str, Tensor]) -> list[Tensor] | None:
+        """Extract tactile sensor data from the batch as a list of (B, H, W) tensors."""
+        if not self.config.use_tactile:
+            return None
+        tactile_keys = self.config.tactile_features if self.config.tactile_features else [OBS_TACTILE]
+        return [batch[k] for k in tactile_keys if k in batch] or None
 
     def prepare_state(self, batch):
         """Pad state"""
@@ -572,6 +597,21 @@ class VLAFlowMatching(nn.Module):
         self.state_proj = nn.Linear(
             self.config.max_state_dim, self.vlm_with_expert.config.text_config.hidden_size
         )
+
+        # Tactile encoder: encodes tactile maps into prefix tokens for the VLM.
+        if config.use_tactile:
+            self.tactile_encoder = TactileTokenEncoder(
+                encoder_type=config.tactile_encoder_type,
+                input_shape=config.tactile_input_shape,
+                feature_dim=config.tactile_feature_dim,
+                n_tokens=config.n_tactile_tokens,
+                dropout=config.tactile_dropout,
+            )
+            # Project tactile token embeddings to VLM hidden size
+            self.tactile_proj = nn.Linear(
+                config.tactile_feature_dim, self.vlm_with_expert.config.text_config.hidden_size
+            )
+
         self.action_in_proj = nn.Linear(self.config.max_action_dim, self.vlm_with_expert.expert_hidden_size)
         self.action_out_proj = nn.Linear(self.vlm_with_expert.expert_hidden_size, self.config.max_action_dim)
 
@@ -624,10 +664,18 @@ class VLAFlowMatching(nn.Module):
         return time
 
     def embed_prefix(
-        self, images, img_masks, lang_tokens, lang_masks, state: torch.Tensor = None
+        self, images, img_masks, lang_tokens, lang_masks, state: torch.Tensor = None, tactile_data=None
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Embed images with SigLIP and language tokens with embedding layer to prepare
         for SmolVLM transformer processing.
+
+        Args:
+            images: list of (B, C, H, W) image tensors
+            img_masks: list of (B,) boolean masks
+            lang_tokens: (B, L) language token ids
+            lang_masks: (B, L) language attention masks
+            state: (B, D) state tensor
+            tactile_data: optional list of (B, H, W) tactile maps, one per sensor
         """
         embs = []
         pad_masks = []
@@ -689,6 +737,17 @@ class VLAFlowMatching(nn.Module):
 
         num_lang_embs = lang_emb.shape[1]
         att_masks += [0] * num_lang_embs
+
+        # Process tactile tokens (injected as prefix tokens before state)
+        if tactile_data is not None and self.config.use_tactile:
+            for tactile_map in tactile_data:
+                # tactile_map: (B, H, W)
+                tokens_t = self.tactile_encoder(tactile_map)  # (B, n_tokens, tactile_feature_dim)
+                tact_emb = self.tactile_proj(tokens_t)  # (B, n_tokens, vlm_hidden_size)
+                bsize, n_tact_tokens = tact_emb.shape[:2]
+                embs.append(tact_emb)
+                pad_masks.append(torch.ones(bsize, n_tact_tokens, dtype=torch.bool, device=tact_emb.device))
+                att_masks += [0] * n_tact_tokens
 
         state_emb = self.state_proj(state)
         state_emb = state_emb[:, None, :] if state_emb.ndim == 2 else state_emb
@@ -761,7 +820,16 @@ class VLAFlowMatching(nn.Module):
         return embs, pad_masks, att_masks
 
     def forward(
-        self, images, img_masks, lang_tokens, lang_masks, state, actions, noise=None, time=None
+        self,
+        images,
+        img_masks,
+        lang_tokens,
+        lang_masks,
+        state,
+        actions,
+        noise=None,
+        time=None,
+        tactile_data=None,
     ) -> Tensor:
         """Do a full training forward pass and compute the loss (batch_size x num_steps x num_motors)"""
         if noise is None:
@@ -774,7 +842,7 @@ class VLAFlowMatching(nn.Module):
         x_t = time_expanded * noise + (1 - time_expanded) * actions
         u_t = noise - actions
         prefix_embs, prefix_pad_masks, prefix_att_masks = self.embed_prefix(
-            images, img_masks, lang_tokens, lang_masks, state=state
+            images, img_masks, lang_tokens, lang_masks, state=state, tactile_data=tactile_data
         )
         suffix_embs, suffix_pad_masks, suffix_att_masks = self.embed_suffix(x_t, time)
 
@@ -806,6 +874,7 @@ class VLAFlowMatching(nn.Module):
         lang_masks,
         state,
         noise=None,
+        tactile_data=None,
         **kwargs: Unpack[ActionSelectKwargs],
     ) -> Tensor:
         """Do a full inference forward and compute the action (batch_size x num_steps x num_motors)"""
@@ -817,7 +886,7 @@ class VLAFlowMatching(nn.Module):
             noise = self.sample_noise(actions_shape, device)
 
         prefix_embs, prefix_pad_masks, prefix_att_masks = self.embed_prefix(
-            images, img_masks, lang_tokens, lang_masks, state=state
+            images, img_masks, lang_tokens, lang_masks, state=state, tactile_data=tactile_data
         )
         prefix_att_2d_masks = make_att_2d_masks(prefix_pad_masks, prefix_att_masks)
         prefix_position_ids = torch.cumsum(prefix_pad_masks, dim=1) - 1

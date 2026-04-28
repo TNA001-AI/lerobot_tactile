@@ -108,9 +108,15 @@ def hw_to_dataset_features(
     joint_fts = {
         key: ftype
         for key, ftype in hw_features.items()
-        if ftype is float or (isinstance(ftype, PolicyFeature) and ftype.type != FeatureType.VISUAL)
+        if ftype is float
+        or (isinstance(ftype, PolicyFeature) and ftype.type not in (FeatureType.VISUAL, FeatureType.TACTILE))
     }
     cam_fts = {key: shape for key, shape in hw_features.items() if isinstance(shape, tuple)}
+    tactile_fts = {
+        key: ftype
+        for key, ftype in hw_features.items()
+        if isinstance(ftype, PolicyFeature) and ftype.type == FeatureType.TACTILE
+    }
 
     if joint_fts and prefix == ACTION:
         features[prefix] = {
@@ -131,6 +137,14 @@ def hw_to_dataset_features(
             "dtype": "video" if use_video else "image",
             "shape": shape,
             "names": ["height", "width", "channels"],
+        }
+
+    for key, pf in tactile_fts.items():
+        dim_names = ["height", "width"] if len(pf.shape) == 2 else [f"dim_{i}" for i in range(len(pf.shape))]
+        features[f"{prefix}.{key}"] = {
+            "dtype": "float32",
+            "shape": pf.shape,
+            "names": dim_names,
         }
 
     _validate_feature_names(features)
@@ -160,6 +174,8 @@ def build_dataset_frame(
             continue
         elif ft["dtype"] == "float32" and len(ft["shape"]) == 1:
             frame[key] = np.array([values[name] for name in ft["names"]], dtype=np.float32)
+        elif ft["dtype"] == "float32":
+            frame[key] = np.array(values[key], dtype=np.float32)
         elif ft["dtype"] in ["image", "video"]:
             frame[key] = values[key.removeprefix(f"{prefix}.images.")]
 

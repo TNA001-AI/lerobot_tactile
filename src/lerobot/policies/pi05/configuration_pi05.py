@@ -36,6 +36,9 @@ class PI05Config(PreTrainedConfig):
     n_obs_steps: int = 1
     chunk_size: int = 50  # Number of action steps to predict, in openpi called "action_horizon"
     n_action_steps: int = 50  # Number of action steps to execute
+    # Frame stride for subsampling dataset frames. Set to 3 to train at 10Hz on 30Hz data.
+    frame_stride: int = 1
+    drop_n_last_frames: int = 0  # (chunk_size - n_action_steps) * frame_stride
 
     # Shorter state and action vectors will be padded to these dimensions
     max_state_dim: int = 32
@@ -68,8 +71,21 @@ class PI05Config(PreTrainedConfig):
             "VISUAL": NormalizationMode.IDENTITY,
             "STATE": NormalizationMode.QUANTILES,  # Pi0.5 uses quantiles for state
             "ACTION": NormalizationMode.QUANTILES,  # Pi0.5 uses quantiles for action
+            "TACTILE": NormalizationMode.MEAN_STD,
         }
     )
+
+    # Tactile sensor configuration
+    use_tactile: bool = False
+    tactile_encoder_type: str = "cnn"  # choices: ["cnn", "attention"]
+    tactile_input_shape: tuple[int, int] = (12, 32)
+    tactile_dropout: float = 0.3
+    tactile_feature_dim: int = 256  # internal CNN output dim before projection to paligemma width
+    # Named tactile sensor keys when using multiple sensors.
+    # Leave as None for single sensor mode (uses "observation.tactile" key).
+    tactile_features: list[str] | None = None
+    # Number of prefix tokens each tactile sensor is encoded into.
+    n_tactile_tokens: int = 1
 
     # Training settings
     gradient_checkpointing: bool = False  # Enable gradient checkpointing for memory optimization
@@ -99,6 +115,9 @@ class PI05Config(PreTrainedConfig):
 
     def __post_init__(self):
         super().__post_init__()
+
+        # Update drop_n_last_frames to account for frame_stride.
+        self.drop_n_last_frames = (self.chunk_size - self.n_action_steps) * self.frame_stride
 
         # Validate configuration
         if self.n_action_steps > self.chunk_size:
@@ -162,7 +181,7 @@ class PI05Config(PreTrainedConfig):
 
     @property
     def action_delta_indices(self) -> list:
-        return list(range(self.chunk_size))
+        return [i * self.frame_stride for i in range(self.chunk_size)]
 
     @property
     def reward_delta_indices(self) -> None:

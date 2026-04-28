@@ -35,7 +35,8 @@ from torchvision.ops.misc import FrozenBatchNorm2d
 
 from lerobot.policies.act.configuration_act import ACTConfig
 from lerobot.policies.pretrained import PreTrainedPolicy
-from lerobot.utils.constants import ACTION, OBS_ENV_STATE, OBS_IMAGES, OBS_STATE
+from lerobot.policies.tactile.encoder import TactileTokenEncoder
+from lerobot.utils.constants import ACTION, OBS_ENV_STATE, OBS_IMAGES, OBS_STATE, OBS_TACTILE
 
 
 class ACTPolicy(PreTrainedPolicy):
@@ -331,6 +332,16 @@ class ACT(nn.Module):
             # Note: The forward method of this returns a dict: {"feature_map": output}.
             self.backbone = IntermediateLayerGetter(backbone_model, return_layers={"layer4": "feature_map"})
 
+        # Tactile encoder for tactile feature extraction.
+        if self.config.use_tactile:
+            self.tactile_encoder = TactileTokenEncoder(
+                encoder_type=config.tactile_encoder_type,
+                input_shape=config.tactile_input_shape,
+                feature_dim=config.dim_model,
+                n_tokens=config.n_tactile_tokens,
+                dropout=config.tactile_dropout,
+            )
+
         # Transformer (acts as VAE decoder when training with the variational objective).
         self.encoder = ACTEncoder(config)
         self.decoder = ACTDecoder(config)
@@ -345,6 +356,7 @@ class ACT(nn.Module):
             self.encoder_env_state_input_proj = nn.Linear(
                 self.config.env_state_feature.shape[0], config.dim_model
             )
+        # Remove projection layer since tactile encoder outputs dim_model directly
         self.encoder_latent_input_proj = nn.Linear(config.latent_dim, config.dim_model)
         if self.config.image_features:
             self.encoder_img_feat_input_proj = nn.Conv2d(
@@ -356,6 +368,9 @@ class ACT(nn.Module):
             n_1d_tokens += 1
         if self.config.env_state_feature:
             n_1d_tokens += 1
+        if self.config.use_tactile:
+            n_sensors = len(self.config.tactile_features) if self.config.tactile_features else 1
+            n_1d_tokens += n_sensors * config.n_tactile_tokens
         self.encoder_1d_feature_pos_embed = nn.Embedding(n_1d_tokens, config.dim_model)
         if self.config.image_features:
             self.encoder_cam_feat_pos_embed = ACTSinusoidalPositionEmbedding2d(config.dim_model // 2)
@@ -399,7 +414,17 @@ class ACT(nn.Module):
                 "actions must be provided when using the variational objective in training mode."
             )
 
-        batch_size = batch[OBS_IMAGES][0].shape[0] if OBS_IMAGES in batch else batch[OBS_ENV_STATE].shape[0]
+        if OBS_IMAGES in batch:
+            batch_size = batch[OBS_IMAGES][0].shape[0]
+        elif OBS_ENV_STATE in batch:
+            batch_size = batch[OBS_ENV_STATE].shape[0]
+        elif self.config.use_tactile:
+            tactile_keys = self.config.tactile_features if self.config.tactile_features else [OBS_TACTILE]
+            batch_size = batch[tactile_keys[0]].shape[0]
+        else:
+            raise ValueError(
+                "Batch must contain at least one of: OBS_IMAGES, OBS_ENV_STATE, or tactile_features"
+            )
 
         # Prepare the latent for input to the transformer encoder.
         if self.config.use_vae and ACTION in batch and self.training:
@@ -464,6 +489,15 @@ class ACT(nn.Module):
         # Environment state token.
         if self.config.env_state_feature:
             encoder_in_tokens.append(self.encoder_env_state_input_proj(batch[OBS_ENV_STATE]))
+        # Tactile token(s). Each sensor produces n_tactile_tokens tokens.
+        # Multi-sensor: iterate over tactile_features keys.
+        # Single sensor: use OBS_TACTILE directly.
+        if self.config.use_tactile:
+            tactile_keys = self.config.tactile_features if self.config.tactile_features else [OBS_TACTILE]
+            for tactile_key in tactile_keys:
+                tactile_tokens = self.tactile_encoder(batch[tactile_key])  # (B, n_tokens, dim_model)
+                for i in range(self.config.n_tactile_tokens):
+                    encoder_in_tokens.append(tactile_tokens[:, i])  # (B, dim_model)
 
         if self.config.image_features:
             # For a list of images, the H and W may vary but H*W is constant.
