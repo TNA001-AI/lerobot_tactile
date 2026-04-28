@@ -107,7 +107,7 @@ def test_make_act_processor_with_tactile_steps():
     batch = transition_to_batch(transition)
 
     processed = preprocessor(batch)
-    assert processed[OBS_TACTILE].shape == (1, 12, 32)
+    assert processed[OBS_TACTILE].shape == (12, 32)
 
 
 def test_act_processor_normalization():
