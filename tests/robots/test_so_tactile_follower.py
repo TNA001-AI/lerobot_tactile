@@ -50,7 +50,7 @@ def _make_bus_mock() -> MagicMock:
 def tactile_follower():
     bus_mock = _make_bus_mock()
     tactile_sensor_mock = MagicMock(name="TactileSensorMock")
-    tactile_sensor_mock.read_data.return_value = np.ones((12, 32), dtype=np.float32)
+    tactile_sensor_mock.get_latest_data.return_value = np.ones((12, 32), dtype=np.float32)
 
     def _bus_side_effect(*_args, **kwargs):
         bus_mock.motors = kwargs["motors"]
@@ -94,7 +94,7 @@ def test_tactile_follower_observation_includes_tactile_data(tactile_follower):
     # Named key: observation.tactile.primary
     assert f"{OBS_TACTILE}.primary" in observation
     assert observation[f"{OBS_TACTILE}.primary"].shape == (12, 32)
-    tactile_sensor_mock.read_data.assert_called()
+    tactile_sensor_mock.get_latest_data.assert_called()
 
 
 def test_tactile_follower_disconnect_closes_sensor(tactile_follower):
