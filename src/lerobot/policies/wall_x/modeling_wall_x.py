@@ -60,6 +60,7 @@ from transformers.models.qwen2_5_vl.modeling_qwen2_5_vl import (
 from transformers.utils import is_torchdynamo_compiling, logging
 
 from lerobot.policies.pretrained import PreTrainedPolicy
+from lerobot.policies.tactile.encoder import TactileTokenEncoder
 from lerobot.policies.utils import populate_queues
 from lerobot.policies.wall_x.configuration_wall_x import WallXConfig
 from lerobot.policies.wall_x.constant import (
@@ -84,7 +85,6 @@ from lerobot.policies.wall_x.utils import (
     process_grounding_points,
     replace_action_token,
 )
-from lerobot.policies.tactile.encoder import TactileTokenEncoder
 from lerobot.utils.constants import ACTION, OBS_STATE, OBS_TACTILE
 
 logger = logging.get_logger(__name__)

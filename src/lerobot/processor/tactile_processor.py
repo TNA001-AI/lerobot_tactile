@@ -15,9 +15,10 @@
 # limitations under the License.
 """Tactile sensor data processing steps"""
 
-import torch
-import numpy as np
 from typing import Any
+
+import numpy as np
+import torch
 
 from lerobot.configs.types import PipelineFeatureType, PolicyFeature
 from lerobot.processor.pipeline import ObservationProcessorStep
