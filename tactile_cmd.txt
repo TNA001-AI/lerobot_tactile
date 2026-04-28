@@ -76,7 +76,7 @@ lerobot-record \
 # Task2 Tube
 # ============================================================
 # ============================================================
-# Task2: ACT + Tactile (4090, 24GB) 
+# Task2: ACT + Tactile (4090, 24GB)
 # ============================================================
 
 # ACT with tactile — n_tactile_tokens=1 (baseline)
@@ -188,7 +188,7 @@ lerobot-train \
     --policy.device=cuda:0 \
     --wandb.enable=true \
     --policy.repo_id=Tna001/dp_without_tactile_small
-    
+
 # DP with tactile — n_tactile_chunks=1 (baseline)
 lerobot-train \
     --dataset.repo_id=Tna001/tactile2 \
@@ -487,7 +487,7 @@ lerobot-record \
     --policy.noise_scheduler_type=DDIM \
     --policy.num_inference_steps=20 \
     --dataset.push_to_hub=False
-    
+
 # Crop
 lerobot-record \
     --robot.type=so_tactile_follower \
@@ -701,7 +701,7 @@ lerobot-record \
     --dataset.single_task="peg and hole" \
     --resume=true
 
-# peg and hole 
+# peg and hole
 lerobot-train \
     --dataset.repo_id=Tna001/tactile_peg_hole_100 \
     --policy.type=act \
@@ -855,7 +855,7 @@ lerobot-record \
     --dataset.episode_time_s=30000 \
     --dataset.single_task="Peg" \
     --policy.path=/data/tao/outputs/train/act_tok4_peg_100/checkpoints/last/pretrained_model \
-    --dataset.push_to_hub=False 
+    --dataset.push_to_hub=False
 
 # eval PI05 tube 100 no tactile
 lerobot-record \
@@ -1045,7 +1045,7 @@ lerobot-train \
     --policy.device=cuda:0 \
     --wandb.enable=true \
     --policy.repo_id=Tna001/pi05_tactile_expertonly
-    
+
 # DP peg eval 10hz vision only
 lerobot-record \
     --robot.type=so_tactile_follower \
@@ -1153,7 +1153,7 @@ lerobot-train \
   --wandb.enable=true \
   --wandb.project=lerobot-bag-pick-clean
 
-#camera only 
+#camera only
 lerobot-train \
   --dataset.repo_id=Tna001/so101_tactile_dp_bag_pick_v2.0_clean \
   --policy.type=diffusion \
@@ -1310,7 +1310,7 @@ lerobot-train \
   --wandb.enable=true \
   --wandb.project=lerobot-bag-pick-clean
 
-#camera only 
+#camera only
 lerobot-train \
   --dataset.repo_id=Tna001/so101_tactile_pen_v1.0 \
   --policy.type=diffusion \
@@ -1384,7 +1384,7 @@ lerobot-train \
   --wandb.enable=true \
   --wandb.project=lerobot-bag-pick
 
-#camera only 
+#camera only
 lerobot-train \
   --dataset.repo_id=Tna001/so101_tactile_single_pen_v1 \
   --policy.type=diffusion \
@@ -1503,7 +1503,7 @@ lerobot-train \
   --wandb.enable=true \
   --wandb.project=lerobot-peg
 
-#camera only 
+#camera only
 lerobot-train \
   --dataset.repo_id=Tna001/so101_tactile_peg \
   --policy.type=diffusion \
@@ -1538,7 +1538,7 @@ lerobot-record \
   --dataset.fps=10 \
   --dataset.reset_time_s=10 \
   --policy.path=/data/tao/train/pi05_expertonly_tube/checkpoints/last/pretrained_model \
-  --policy.device=cuda 
+  --policy.device=cuda
 
 # ============================================================
 # Mar 23 train
@@ -1596,8 +1596,8 @@ lerobot-train \
   --policy.device=cuda \
   --wandb.enable=true \
   --policy.repo_id=Tna001/pi05_expertonly_tube \
-  --peft.method_type=LORA \ 
-  --peft.r=64    
+  --peft.method_type=LORA \
+  --peft.r=64
 
 lerobot-train \
   --dataset.repo_id=Tna001/tactile_tube_new \
@@ -1653,7 +1653,7 @@ lerobot-record \
   --dataset.fps=10 \
   --dataset.reset_time_s=3 \
   --policy.path=/data/tao/train/pi05_tactile_expertonly_tube/checkpoints/last/pretrained_model \
-  --policy.device=cuda 
+  --policy.device=cuda
 
 lerobot-train \
   --dataset.repo_id=Tna001/tactile_tube_new \
@@ -1673,7 +1673,7 @@ lerobot-train \
   --wandb.enable=true \
   --policy.repo_id=Tna001/pi05_expertonly_tube_lora \
   --peft.method_type=LORA \
-  --peft.r=64    
+  --peft.r=64
 
 lerobot-record \
   --robot.type=so_tactile_follower \
@@ -1696,8 +1696,8 @@ lerobot-record \
 # Mar 29 train
 # ============================================================
 
-1. SmolVLA baseline                                                           
-                                                                                                        
+1. SmolVLA baseline
+
 lerobot-train \
   --policy.path=lerobot/smolvla_base \
   --dataset.repo_id=Tna001/tactile_tube_new \
@@ -1855,7 +1855,7 @@ lerobot-train \
   --policy.device=cuda \
   --wandb.enable=true \
   --policy.repo_id=Tna001/wallx_tube_baseline
-  
+
 # ACT without tactile
 lerobot-train \
   --dataset.repo_id=Tna001/so101_tactile_pens_bag_v1 \
@@ -1908,7 +1908,7 @@ lerobot-train \
   --wandb.enable=true \
   --wandb.project=lerobot-pens_bag
 
-#camera only 
+#camera only
 lerobot-train \
   --dataset.repo_id=Tna001/so101_tactile_pens_bag_v1 \
   --policy.type=diffusion \
@@ -1932,8 +1932,8 @@ lerobot-train \
 # Mar 29 train
 # ============================================================
 
-1. SmolVLA baseline                                                           
-                                                                                                        
+1. SmolVLA baseline
+
 lerobot-train \
   --policy.path=lerobot/smolvla_base \
   --dataset.repo_id=Tna001/so101_tactile_peg \
@@ -2158,7 +2158,7 @@ lerobot-record \
   --dataset.fps=10 \
   --dataset.reset_time_s=10 \
   --policy.path=/data/tao/pi05_full_tactile_1xH200_100/checkpoints/050000/pretrained_model \
-  --policy.device=cuda 
+  --policy.device=cuda
 
 # collect more data
 lerobot-record \
@@ -2261,8 +2261,8 @@ lerobot-record \
 # ============================================================
 # Apr 5 train
 # ============================================================
-1. SmolVLA baseline                                                           
-                                                                                                        
+1. SmolVLA baseline
+
 lerobot-train \
   --policy.path=lerobot/smolvla_base \
   --dataset.repo_id=Tna001/so101_tactile_pens_bag_v1 \
@@ -2298,7 +2298,7 @@ lerobot-train \
   --policy.repo_id=Tna001/smolvla_tactile_tok4_pens_10hz \
   --wandb.enable=true
 
-  
+
   --dataset.single_task="Grab the pen from the bag and place it in the basket next to it" \
   /projects/bgku/ntao/checkpoints/pi05_full_ddp_1xH200/checkpoints
 
@@ -2383,8 +2383,8 @@ lerobot-record \
 # ============================================================
 # Apr 12 train
 # ============================================================
-1. SmolVLA baseline                                                           
-                                                                                                        
+1. SmolVLA baseline
+
 lerobot-train \
   --policy.path=lerobot/smolvla_base \
   --dataset.repo_id=Tna001/tactile_peg_hole_new \
