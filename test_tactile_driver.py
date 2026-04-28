@@ -3,10 +3,11 @@
 
 import sys
 import time
+
 import numpy as np
 
 # Add src to path
-sys.path.insert(0, '/home/tao/lerobot_tactile/src')
+sys.path.insert(0, "/home/tao/lerobot_tactile/src")
 
 from lerobot.sensors.tactile_sensor import TactileSensor
 
@@ -64,13 +65,17 @@ def main():
                 if now - last_print_time >= 1.0:
                     fps = frame_count / (now - start_time)
                     non_zero = np.count_nonzero(data)
-                    print(f"Time: {now - start_time:.1f}s | Frames: {frame_count} | FPS: {fps:.1f} | "
-                          f"Min: {data.min():.1f} | Max: {data.max():.1f} | Mean: {data.mean():.1f} | NonZero: {non_zero}/{data.size}")
+                    print(
+                        f"Time: {now - start_time:.1f}s | Frames: {frame_count} | FPS: {fps:.1f} | "
+                        f"Min: {data.min():.1f} | Max: {data.max():.1f} | Mean: {data.mean():.1f} | NonZero: {non_zero}/{data.size}"
+                    )
                     last_print_time = now
 
                 # Alert if non-zero data detected
                 if np.any(data > 0):
-                    print(f"  >>> TOUCH DETECTED! Max pressure: {data.max():.1f} at location {np.unravel_index(data.argmax(), data.shape)}")
+                    print(
+                        f"  >>> TOUCH DETECTED! Max pressure: {data.max():.1f} at location {np.unravel_index(data.argmax(), data.shape)}"
+                    )
             time.sleep(0.005)
 
     except KeyboardInterrupt:

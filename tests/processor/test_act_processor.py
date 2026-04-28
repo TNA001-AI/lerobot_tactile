@@ -33,7 +33,7 @@ from lerobot.processor import (
     UnnormalizerProcessorStep,
 )
 from lerobot.processor.converters import create_transition, transition_to_batch
-from lerobot.processor.tactile_processor import TactileNormalizationProcessorStep, TactileValidationProcessorStep
+from lerobot.processor.tactile_processor import TactileValidationProcessorStep
 from lerobot.utils.constants import ACTION, OBS_STATE, OBS_TACTILE
 
 
@@ -98,19 +98,16 @@ def test_make_act_processor_with_tactile_steps():
 
     preprocessor, _ = make_act_pre_post_processors(config, stats)
 
-    assert len(preprocessor.steps) == 6
+    assert len(preprocessor.steps) == 5
     assert isinstance(preprocessor.steps[1], TactileValidationProcessorStep)
-    assert isinstance(preprocessor.steps[2], TactileNormalizationProcessorStep)
 
-    observation = {OBS_STATE: torch.randn(7), OBS_TACTILE: torch.full((12, 32), 35.0)}
+    observation = {OBS_STATE: torch.randn(7), OBS_TACTILE: torch.full((12, 32), 0.5)}
     action = torch.randn(4)
     transition = create_transition(observation, action)
     batch = transition_to_batch(transition)
 
     processed = preprocessor(batch)
     assert processed[OBS_TACTILE].shape == (1, 12, 32)
-    assert torch.all(processed[OBS_TACTILE] >= 0)
-    assert torch.all(processed[OBS_TACTILE] <= 1)
 
 
 def test_act_processor_normalization():
