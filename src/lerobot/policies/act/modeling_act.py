@@ -422,7 +422,9 @@ class ACT(nn.Module):
             tactile_keys = self.config.tactile_features if self.config.tactile_features else [OBS_TACTILE]
             batch_size = batch[tactile_keys[0]].shape[0]
         else:
-            raise ValueError("Batch must contain at least one of: OBS_IMAGES, OBS_ENV_STATE, or tactile_features")
+            raise ValueError(
+                "Batch must contain at least one of: OBS_IMAGES, OBS_ENV_STATE, or tactile_features"
+            )
 
         # Prepare the latent for input to the transformer encoder.
         if self.config.use_vae and ACTION in batch and self.training:

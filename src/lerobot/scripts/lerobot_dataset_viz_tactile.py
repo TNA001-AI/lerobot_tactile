@@ -79,10 +79,7 @@ def tactile_keys(dataset: LeRobotDataset) -> list[str]:
 def _normalize_tactile(data: np.ndarray) -> np.ndarray:
     """Adaptive normalization matching TactileSensor._normalize_data."""
     max_val = float(np.max(data))
-    if max_val < TACTILE_THRESHOLD:
-        normalized = data / TACTILE_NOISE_SCALE
-    else:
-        normalized = data / (max_val + 1e-6)
+    normalized = data / TACTILE_NOISE_SCALE if max_val < TACTILE_THRESHOLD else data / (max_val + 1e-06)
     return np.clip(normalized, 0.0, 1.0)
 
 

@@ -21,7 +21,7 @@ from lerobot.optim.schedulers import (
     CosineDecayWithWarmupSchedulerConfig,
 )
 from lerobot.policies.rtc.configuration_rtc import RTCConfig
-from lerobot.utils.constants import OBS_IMAGES, OBS_TACTILE
+from lerobot.utils.constants import OBS_IMAGES
 
 
 @PreTrainedConfig.register_subclass("smolvla")

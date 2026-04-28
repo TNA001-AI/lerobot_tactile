@@ -517,7 +517,9 @@ def get_wallx_normal_text(
         tactile_prompt = ""
         if n_tactile_tokens > 0:
             tactile_prompt = f"\nTactile: {tactile_symbol * n_tactile_tokens}"
-        text_prompt = f"\nPredict the next action in robot action.\nProprioception: {propri_symbol}{tactile_prompt}\n"
+        text_prompt = (
+            f"\nPredict the next action in robot action.\nProprioception: {propri_symbol}{tactile_prompt}\n"
+        )
         user_message = f"{user_request} {instruction}{text_prompt}{role_end_symbol}\n"
         assistant_output = f"{role_start_symbol}assistant\n{action_fast_symbol}{role_end_symbol}\n{action_symbol * action_chunk_size}"
 

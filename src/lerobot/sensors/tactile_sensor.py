@@ -15,11 +15,12 @@
 # limitations under the License.
 """Tactile sensor interface for LeRobot"""
 
+import contextlib
 import logging
-import time
-import threading
 import multiprocessing as mp
-from typing import Optional
+import threading
+import time
+from queue import Empty, Full
 
 import cv2
 import numpy as np
@@ -35,7 +36,7 @@ def _visualization_worker(queue: mp.Queue, window_name: str, shape: tuple):
     while True:
         try:
             frame = queue.get(timeout=1.0)
-        except Exception:
+        except Empty:
             continue
         if frame is None:
             break
@@ -48,7 +49,7 @@ class TactileSensor:
     """Interface for 12x32 tactile sensor array via USB serial communication"""
 
     # Binary protocol constants
-    MAGIC = b"\xAA\x55"
+    MAGIC = b"\xaa\x55"
     ROWS, COLS = 12, 32
     FRAME_BYTES = ROWS * COLS  # 384
 
@@ -85,8 +86,8 @@ class TactileSensor:
         self.timeout = timeout
         self.shape = shape
 
-        self.serial_conn: Optional[serial.Serial] = None
-        self.baseline: Optional[np.ndarray] = None
+        self.serial_conn: serial.Serial | None = None
+        self.baseline: np.ndarray | None = None
         self.is_connected = False
         self.is_calibrated = False
 
@@ -96,8 +97,8 @@ class TactileSensor:
 
         # Threading for continuous data collection
         self._stop_event = threading.Event()
-        self._data_thread: Optional[threading.Thread] = None
-        self._latest_data: Optional[np.ndarray] = None
+        self._data_thread: threading.Thread | None = None
+        self._latest_data: np.ndarray | None = None
         self._data_lock = threading.Lock()
 
         # Visualization settings
@@ -106,9 +107,9 @@ class TactileSensor:
         self.threshold = threshold
         self.noise_scale = noise_scale
         self.temporal_alpha = temporal_alpha
-        self._prev_frame: Optional[np.ndarray] = None
-        self._viz_queue: Optional[mp.Queue] = None
-        self._viz_process: Optional[mp.Process] = None
+        self._prev_frame: np.ndarray | None = None
+        self._viz_queue: mp.Queue | None = None
+        self._viz_process: mp.Process | None = None
         self._visualization_initialized = False
 
         # Connect and calibrate
@@ -162,7 +163,7 @@ class TactileSensor:
             self.is_connected = False
             logging.info("Disconnected from tactile sensor")
 
-    def _read_exact(self, n: int) -> Optional[bytearray]:
+    def _read_exact(self, n: int) -> bytearray | None:
         """Read exactly n bytes from serial (blocking up to timeout loops)."""
         buf = bytearray(n)
         mv = memoryview(buf)
@@ -185,7 +186,7 @@ class TactileSensor:
             return None
         return buf
 
-    def read_raw_data(self) -> Optional[np.ndarray]:
+    def read_raw_data(self) -> np.ndarray | None:
         """Read raw data from sensor (binary format with magic header 0xAA 0x55)"""
         if not self.is_connected or not self.serial_conn:
             logging.warning("Sensor not connected")
@@ -195,9 +196,7 @@ class TactileSensor:
             # Drain the OS serial buffer so _ring_buffer reflects everything
             # that has arrived up to now, not just one 8192-byte chunk.
             if self.serial_conn.in_waiting:
-                self._ring_buffer.extend(
-                    self.serial_conn.read(self.serial_conn.in_waiting)
-                )
+                self._ring_buffer.extend(self.serial_conn.read(self.serial_conn.in_waiting))
 
             # Read chunks and search for magic header
             while True:
@@ -232,8 +231,8 @@ class TactileSensor:
 
                 # Extract frame bytes (may need to read more if not enough in buffer)
                 if len(self._ring_buffer) >= self.FRAME_BYTES:
-                    self._frame_buffer[:] = self._ring_buffer[:self.FRAME_BYTES]
-                    del self._ring_buffer[:self.FRAME_BYTES]
+                    self._frame_buffer[:] = self._ring_buffer[: self.FRAME_BYTES]
+                    del self._ring_buffer[: self.FRAME_BYTES]
                 else:
                     # Partial frame in buffer - need to read remaining bytes
                     have = len(self._ring_buffer)
@@ -247,7 +246,11 @@ class TactileSensor:
                     self._frame_buffer[have:] = rest
 
                 # Convert to numpy array
-                frame = np.frombuffer(self._frame_buffer, dtype=np.uint8).reshape((self.ROWS, self.COLS)).astype(np.float32)
+                frame = (
+                    np.frombuffer(self._frame_buffer, dtype=np.uint8)
+                    .reshape((self.ROWS, self.COLS))
+                    .astype(np.float32)
+                )
 
                 # Drain any remaining complete frames in the ring buffer so we
                 # always return the LATEST frame, not the oldest one queued up.
@@ -255,10 +258,14 @@ class TactileSensor:
                     idx2 = self._ring_buffer.find(self.MAGIC)
                     if idx2 < 0 or idx2 + 2 + self.FRAME_BYTES > len(self._ring_buffer):
                         break
-                    del self._ring_buffer[:idx2 + 2]
-                    self._frame_buffer[:] = self._ring_buffer[:self.FRAME_BYTES]
-                    del self._ring_buffer[:self.FRAME_BYTES]
-                    frame = np.frombuffer(self._frame_buffer, dtype=np.uint8).reshape((self.ROWS, self.COLS)).astype(np.float32)
+                    del self._ring_buffer[: idx2 + 2]
+                    self._frame_buffer[:] = self._ring_buffer[: self.FRAME_BYTES]
+                    del self._ring_buffer[: self.FRAME_BYTES]
+                    frame = (
+                        np.frombuffer(self._frame_buffer, dtype=np.uint8)
+                        .reshape((self.ROWS, self.COLS))
+                        .astype(np.float32)
+                    )
 
                 return frame
 
@@ -299,7 +306,7 @@ class TactileSensor:
         logging.info("Tactile sensor calibration completed")
         return True
 
-    def read_data(self) -> Optional[np.ndarray]:
+    def read_data(self) -> np.ndarray | None:
         """Read processed tactile data (raw - baseline - threshold)"""
         raw_data = self.read_raw_data()
         if raw_data is None:
@@ -343,8 +350,7 @@ class TactileSensor:
                     self._latest_data = data.copy()
                 self.update_visualization(data)
 
-
-    def get_latest_data(self) -> Optional[np.ndarray]:
+    def get_latest_data(self) -> np.ndarray | None:
         """Get latest data from continuous reading"""
         with self._data_lock:
             return self._latest_data.copy() if self._latest_data is not None else None
@@ -389,17 +395,10 @@ class TactileSensor:
             Normalized data in range [0, 1]
         """
         max_val = np.max(data)
-        if max_val < self.threshold:
-            # Low pressure - use noise scale normalization
-            normalized = data / self.noise_scale
-        else:
-            # High pressure - normalize by max value
-            normalized = data / (max_val + 1e-6)
-
+        normalized = data / self.noise_scale if max_val < self.threshold else data / (max_val + 1e-6)
         return np.clip(normalized, 0, 1)
 
-
-    def update_visualization(self, data: Optional[np.ndarray] = None) -> bool:
+    def update_visualization(self, data: np.ndarray | None = None) -> bool:
         """
         Update the visualization with current tactile data.
 
@@ -436,10 +435,8 @@ class TactileSensor:
 
         # Send to visualization subprocess (non-blocking; drop frame if process is busy)
         if self._viz_queue is not None:
-            try:
+            with contextlib.suppress(Full):
                 self._viz_queue.put_nowait(colormap)
-            except Exception:
-                pass  # Queue full — skip frame, don't block
 
         return True
 
@@ -447,10 +444,8 @@ class TactileSensor:
         """Stop the visualization subprocess."""
         if self._visualization_initialized:
             if self._viz_queue is not None:
-                try:
+                with contextlib.suppress(Full):
                     self._viz_queue.put_nowait(None)  # sentinel to stop worker
-                except Exception:
-                    pass
             if self._viz_process is not None and self._viz_process.is_alive():
                 self._viz_process.join(timeout=2.0)
                 if self._viz_process.is_alive():
@@ -468,7 +463,5 @@ class TactileSensor:
 
     def __del__(self):
         """Cleanup on deletion"""
-        try:
+        with contextlib.suppress(Exception):
             self.disconnect()
-        except:
-            pass  # Ignore cleanup errors

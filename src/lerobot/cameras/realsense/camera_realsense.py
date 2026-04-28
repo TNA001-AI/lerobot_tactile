@@ -474,7 +474,7 @@ class RealSenseCamera(Camera):
                 processed_image = cv2.resize(
                     processed_image,
                     (self.target_width, self.target_height),
-                    interpolation=cv2.INTER_AREA  # Best for downsampling
+                    interpolation=cv2.INTER_AREA,  # Best for downsampling
                 )
 
         return processed_image

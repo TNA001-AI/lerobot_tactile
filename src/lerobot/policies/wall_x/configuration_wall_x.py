@@ -18,7 +18,7 @@ from lerobot.configs.policies import PreTrainedConfig
 from lerobot.configs.types import FeatureType, NormalizationMode, PolicyFeature
 from lerobot.optim.optimizers import AdamWConfig
 from lerobot.optim.schedulers import CosineDecayWithWarmupSchedulerConfig
-from lerobot.utils.constants import ACTION, OBS_STATE, OBS_TACTILE
+from lerobot.utils.constants import ACTION, OBS_STATE
 
 
 @PreTrainedConfig.register_subclass("wall_x")

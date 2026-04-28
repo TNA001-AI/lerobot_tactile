@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import contextlib
 import logging
 from typing import Any
 
@@ -97,7 +98,5 @@ class SOTactileFollower(SOFollower):
         super().disconnect()
 
     def __del__(self):
-        try:
+        with contextlib.suppress(Exception):
             self.disconnect()
-        except Exception:
-            pass
