@@ -37,6 +37,12 @@ The tactile sensors are driven by [PyFlexiTac](https://github.com/WT-MM/PyFlexiT
 
 ```bash
 # In the same `lerobot` env
+conda activate lerobot
+
+# From PyPI
+pip install pyflexitac
+
+# From source
 git clone https://github.com/WT-MM/PyFlexiTac.git
 cd PyFlexiTac
 pip install -e .

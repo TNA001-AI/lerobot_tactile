@@ -13,14 +13,14 @@ import logging
 import multiprocessing as mp
 import threading
 import time
-from typing import Optional
+from types import Self, TracebackType
 
 import cv2
 import numpy as np
 from flexitac import FlexiTacSensor
 
 
-def _visualization_worker(queue: mp.Queue, window_name: str, shape: tuple):
+def _visualization_worker(queue: mp.Queue, window_name: str, shape: tuple[int, int]) -> None:
     """Subprocess entry point: receives colormap frames and displays via OpenCV."""
     window_width = shape[1] * 60
     window_height = shape[0] * 60
@@ -53,7 +53,7 @@ class TactileSensor:
         threshold: float = 25.0,
         noise_scale: float = 30.0,
         temporal_alpha: float = 0.2,
-    ):
+    ) -> None:
         """Initialize tactile sensor.
 
         Args:
@@ -89,17 +89,17 @@ class TactileSensor:
 
         # Threading for continuous data collection
         self._stop_event = threading.Event()
-        self._data_thread: Optional[threading.Thread] = None
-        self._latest_data: Optional[np.ndarray] = None
+        self._data_thread: threading.Thread | None = None
+        self._latest_data: np.ndarray | None = None
         self._data_lock = threading.Lock()
 
         # Visualization settings
         self.enable_visualization = enable_visualization
         self.window_name = window_name
         self.temporal_alpha = temporal_alpha
-        self._prev_frame: Optional[np.ndarray] = None
-        self._viz_queue: Optional[mp.Queue] = None
-        self._viz_process: Optional[mp.Process] = None
+        self._prev_frame: np.ndarray | None = None
+        self._viz_queue: mp.Queue | None = None
+        self._viz_process: mp.Process | None = None
         self._visualization_initialized = False
 
         self.connect()
@@ -107,7 +107,7 @@ class TactileSensor:
             self._init_visualization()
 
     @property
-    def baseline(self) -> Optional[np.ndarray]:
+    def baseline(self) -> np.ndarray | None:
         return self._sensor.baseline
 
     @property
@@ -152,7 +152,7 @@ class TactileSensor:
         self.is_connected = True
         logging.info(f"Connected to tactile sensor on {self.port}")
 
-    def disconnect(self):
+    def disconnect(self) -> None:
         self.stop_continuous_read()
         self.close_visualization()
         self._sensor.close()
@@ -168,7 +168,7 @@ class TactileSensor:
             logging.error(f"Calibration failed: {e}")
             return False
 
-    def read_data(self) -> Optional[np.ndarray]:
+    def read_data(self) -> np.ndarray | None:
         """Read normalized tactile data (0-1 range) from the sensor."""
         try:
             frame = self._sensor.read_latest()
@@ -177,7 +177,7 @@ class TactileSensor:
             logging.warning(f"Read error: {e}")
             return None
 
-    def start_continuous_read(self):
+    def start_continuous_read(self) -> None:
         if self._data_thread and self._data_thread.is_alive():
             logging.warning("Continuous reading already started")
             return
@@ -186,13 +186,13 @@ class TactileSensor:
         self._data_thread.start()
         logging.info("Started continuous tactile data reading")
 
-    def stop_continuous_read(self):
+    def stop_continuous_read(self) -> None:
         if self._data_thread and self._data_thread.is_alive():
             self._stop_event.set()
             self._data_thread.join(timeout=1.0)
             logging.info("Stopped continuous tactile data reading")
 
-    def _continuous_read_loop(self):
+    def _continuous_read_loop(self) -> None:
         while not self._stop_event.is_set():
             data = self.read_data()
             if data is not None:
@@ -202,11 +202,11 @@ class TactileSensor:
             else:
                 time.sleep(0.01)
 
-    def get_latest_data(self) -> Optional[np.ndarray]:
+    def get_latest_data(self) -> np.ndarray | None:
         with self._data_lock:
             return self._latest_data.copy() if self._latest_data is not None else None
 
-    def _init_visualization(self):
+    def _init_visualization(self) -> None:
         self._viz_queue = mp.Queue(maxsize=2)
         display_shape = (self.rows, self.cols)
         self._viz_process = mp.Process(
@@ -226,7 +226,7 @@ class TactileSensor:
         self._prev_frame = filtered.copy()
         return filtered
 
-    def update_visualization(self, data: Optional[np.ndarray] = None) -> bool:
+    def update_visualization(self, data: np.ndarray | None = None) -> bool:
         if not self.enable_visualization:
             return False
         if not self._visualization_initialized:
@@ -247,7 +247,7 @@ class TactileSensor:
                 pass
         return True
 
-    def close_visualization(self):
+    def close_visualization(self) -> None:
         if self._visualization_initialized:
             if self._viz_queue is not None:
                 try:
@@ -263,8 +263,8 @@ class TactileSensor:
             self._visualization_initialized = False
             logging.info(f"Visualization process for '{self.window_name}' stopped")
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type: type | None, exc_val: Exception | None, exc_tb: TracebackType | None) -> None:
         self.disconnect()
