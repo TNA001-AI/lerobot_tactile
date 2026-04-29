@@ -20,7 +20,7 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-from lerobot.robots.so100_tactile_follower import SO100TactileFollower, SO100TactileFollowerConfig
+from lerobot.robots.so_tactile_follower import SOTactileFollower, SOTactileFollowerConfig
 from lerobot.sensors import TactileSensorConfig
 from lerobot.utils.constants import OBS_TACTILE
 
@@ -69,18 +69,18 @@ def tactile_follower():
             side_effect=_bus_side_effect,
         ),
         patch(
-            "lerobot.robots.so100_tactile_follower.so100_tactile_follower.TactileSensor",
+            "lerobot.robots.so_tactile_follower.so_tactile_follower.TactileSensor",
             return_value=tactile_sensor_mock,
         ),
-        patch.object(SO100TactileFollower, "configure", lambda self: None),
+        patch.object(SOTactileFollower, "configure", lambda self: None),
     ):
-        cfg = SO100TactileFollowerConfig(
+        cfg = SOTactileFollowerConfig(
             port="/dev/null",
             tactile_sensors={
                 "primary": TactileSensorConfig(port="/dev/null", baseline=20.0),
             },
         )
-        robot = SO100TactileFollower(cfg)
+        robot = SOTactileFollower(cfg)
         yield robot, tactile_sensor_mock
         if robot.is_connected:
             robot.disconnect()
@@ -122,10 +122,10 @@ def test_tactile_follower_no_sensors_returns_no_tactile_data():
 
     with (
         patch("lerobot.robots.so_follower.so_follower.FeetechMotorsBus", side_effect=_bus_side_effect),
-        patch.object(SO100TactileFollower, "configure", lambda self: None),
+        patch.object(SOTactileFollower, "configure", lambda self: None),
     ):
-        cfg = SO100TactileFollowerConfig(port="/dev/null")  # empty tactile_sensors
-        robot = SO100TactileFollower(cfg)
+        cfg = SOTactileFollowerConfig(port="/dev/null")  # empty tactile_sensors
+        robot = SOTactileFollower(cfg)
         robot.connect()
         observation = robot.get_observation()
         # No tactile keys should appear

@@ -182,7 +182,9 @@ class DiffusionConfig(PreTrainedConfig):
         super().__post_init__()
 
         # Update drop_n_last_frames to account for frame_stride.
-        self.drop_n_last_frames = (self.horizon - self.n_action_steps - self.n_obs_steps + 1) * self.frame_stride
+        self.drop_n_last_frames = (
+            self.horizon - self.n_action_steps - self.n_obs_steps + 1
+        ) * self.frame_stride
 
         """Input validation (not exhaustive)."""
         if not self.vision_backbone.startswith("resnet"):
@@ -271,7 +273,9 @@ class DiffusionConfig(PreTrainedConfig):
 
     @property
     def action_delta_indices(self) -> list:
-        return [i * self.frame_stride for i in range(1 - self.n_obs_steps, 1 - self.n_obs_steps + self.horizon)]
+        return [
+            i * self.frame_stride for i in range(1 - self.n_obs_steps, 1 - self.n_obs_steps + self.horizon)
+        ]
 
     @property
     def reward_delta_indices(self) -> None:

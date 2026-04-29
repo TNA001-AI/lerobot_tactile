@@ -16,7 +16,7 @@
 
 from .config import RobotConfig
 from .robot import Robot
-from .utils import make_robot_from_config
 
 # Import tactile-enabled robot for registration
-from .so100_tactile_follower import SO100TactileFollower, SO100TactileFollowerConfig
+from .so_tactile_follower import SOTactileFollower, SOTactileFollowerConfig
+from .utils import make_robot_from_config

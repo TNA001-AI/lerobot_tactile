@@ -64,11 +64,17 @@ from lerobot.policies.pretrained import PreTrainedPolicy
 from lerobot.policies.rtc.modeling_rtc import RTCProcessor
 from lerobot.policies.smolvla.configuration_smolvla import SmolVLAConfig
 from lerobot.policies.smolvla.smolvlm_with_expert import SmolVLMWithExpertModel
+from lerobot.policies.tactile.encoder import TactileTokenEncoder
 from lerobot.policies.utils import (
     populate_queues,
 )
-from lerobot.policies.tactile.encoder import TactileTokenEncoder
-from lerobot.utils.constants import ACTION, OBS_LANGUAGE_ATTENTION_MASK, OBS_LANGUAGE_TOKENS, OBS_STATE, OBS_TACTILE
+from lerobot.utils.constants import (
+    ACTION,
+    OBS_LANGUAGE_ATTENTION_MASK,
+    OBS_LANGUAGE_TOKENS,
+    OBS_STATE,
+    OBS_TACTILE,
+)
 from lerobot.utils.device_utils import get_safe_dtype
 
 
@@ -290,7 +296,14 @@ class SmolVLAPolicy(PreTrainedPolicy):
         tactile_data = self._extract_tactile_data(batch)
 
         actions = self.model.sample_actions(
-            images, img_masks, lang_tokens, lang_masks, state, noise=noise, tactile_data=tactile_data, **kwargs
+            images,
+            img_masks,
+            lang_tokens,
+            lang_masks,
+            state,
+            noise=noise,
+            tactile_data=tactile_data,
+            **kwargs,
         )
 
         # Unpad actions
@@ -379,7 +392,9 @@ class SmolVLAPolicy(PreTrainedPolicy):
         actions = self.prepare_action(batch)
         actions_is_pad = batch.get("action_is_pad")
         loss_dict = {}
-        losses = self.model.forward(images, img_masks, lang_tokens, lang_masks, state, actions, noise, time, tactile_data=tactile_data)
+        losses = self.model.forward(
+            images, img_masks, lang_tokens, lang_masks, state, actions, noise, time, tactile_data=tactile_data
+        )
         original_action_dim = self.config.action_feature.shape[0]
         losses = losses[:, :, :original_action_dim]
         loss_dict["losses_after_forward"] = losses.clone().mean().item()
@@ -805,7 +820,16 @@ class VLAFlowMatching(nn.Module):
         return embs, pad_masks, att_masks
 
     def forward(
-        self, images, img_masks, lang_tokens, lang_masks, state, actions, noise=None, time=None, tactile_data=None
+        self,
+        images,
+        img_masks,
+        lang_tokens,
+        lang_masks,
+        state,
+        actions,
+        noise=None,
+        time=None,
+        tactile_data=None,
     ) -> Tensor:
         """Do a full training forward pass and compute the loss (batch_size x num_steps x num_motors)"""
         if noise is None:

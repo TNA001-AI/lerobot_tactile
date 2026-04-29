@@ -13,9 +13,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""SO100 follower robot with tactile sensor support"""
+"""SO follower robot (SO-100/101/10X) with tactile sensor support"""
 
-from lerobot.robots.so100_tactile_follower.config_so100_tactile_follower import SO100TactileFollowerConfig
-from lerobot.robots.so100_tactile_follower.so100_tactile_follower import SO100TactileFollower
+from lerobot.robots.so_tactile_follower.config_so_tactile_follower import SOTactileFollowerConfig
+from lerobot.robots.so_tactile_follower.so_tactile_follower import SOTactileFollower
 
-__all__ = ["SO100TactileFollowerConfig", "SO100TactileFollower"]
+__all__ = ["SOTactileFollowerConfig", "SOTactileFollower"]

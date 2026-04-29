@@ -147,16 +147,10 @@ class TactileSensor:
             "baseline": baseline.tolist() if baseline is not None else None,
         }
 
-    def connect(self) -> bool:
-        try:
-            self._sensor.open()
-            self.is_connected = True
-            logging.info(f"Connected to tactile sensor on {self.port}")
-            return True
-        except Exception as e:
-            logging.error(f"Failed to connect to tactile sensor on {self.port}: {e}")
-            self.is_connected = False
-            return False
+    def connect(self) -> None:
+        self._sensor.open()
+        self.is_connected = True
+        logging.info(f"Connected to tactile sensor on {self.port}")
 
     def disconnect(self):
         self.stop_continuous_read()
@@ -274,9 +268,3 @@ class TactileSensor:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.disconnect()
-
-    def __del__(self):
-        try:
-            self.disconnect()
-        except Exception:
-            pass

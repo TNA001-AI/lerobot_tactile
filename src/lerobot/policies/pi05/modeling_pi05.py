@@ -763,7 +763,9 @@ class PI05Pytorch(nn.Module):  # see openpi `PI0Pytorch`
 
         return embs, pad_masks, att_masks, adarms_cond
 
-    def forward(self, images, img_masks, tokens, masks, actions, noise=None, time=None, tactile_data=None) -> Tensor:
+    def forward(
+        self, images, img_masks, tokens, masks, actions, noise=None, time=None, tactile_data=None
+    ) -> Tensor:
         """Do a full training forward pass and compute the loss."""
         if noise is None:
             noise = self.sample_noise(actions.shape, actions.device)
@@ -1286,7 +1288,9 @@ class PI05Policy(PreTrainedPolicy):
         tactile_data = self._extract_tactile_data(batch)
 
         # Sample actions using the model (pass through RTC kwargs, no separate state needed for PI05)
-        actions = self.model.sample_actions(images, img_masks, tokens, masks, tactile_data=tactile_data, **kwargs)
+        actions = self.model.sample_actions(
+            images, img_masks, tokens, masks, tactile_data=tactile_data, **kwargs
+        )
 
         # Unpad actions to actual action dimension
         original_action_dim = self.config.output_features[ACTION].shape[0]

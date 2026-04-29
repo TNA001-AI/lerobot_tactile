@@ -249,10 +249,8 @@ def preprocesser_call(
     # Mask special action tokens in labels
     action_token_id = processor.tokenizer.encode("<|action|>")[0]
     propri_token_id = processor.tokenizer.encode("<|propri|>")[0]
-    tactile_token_id = processor.tokenizer.encode("<|tactile|>")[0]
     labels[labels == action_token_id] = -100
     labels[labels == propri_token_id] = -100
-    labels[labels == tactile_token_id] = -100
     labels[labels == processor.tokenizer.pad_token_id] = -100
 
     # Set labels to None if all are invalid to skip cross entropy loss
@@ -441,7 +439,6 @@ def get_wallx_normal_text(
     priority_order: OrderedDict | None = None,
     img_keys: list[str] | None = None,
     generate_subtask_ratio: float = 0.0,
-    n_tactile_tokens: int = 0,
 ) -> tuple[str, bool]:
     """Construct complete multimodal prompt text for Wall-X model.
 
@@ -450,7 +447,6 @@ def get_wallx_normal_text(
     - User observations (with image placeholders)
     - Task instructions
     - Proprioception prompts
-    - Tactile prompts (optional)
     - Assistant responses (with action tokens)
 
     Args:
@@ -460,7 +456,6 @@ def get_wallx_normal_text(
         priority_order: Priority order for instruction sampling
         img_keys: List of image keys
         generate_subtask_ratio: Probability of generating subtask instead of actions
-        n_tactile_tokens: Total number of tactile tokens to insert (0 = no tactile)
 
     Returns:
         Tuple of (formatted_prompt_text, is_subtask_generation)
@@ -472,7 +467,6 @@ def get_wallx_normal_text(
     vision_end_symbol = "<|vision_end|>"
     image_pad_symbol = "<|image_pad|>"
     propri_symbol = "<|propri|>"
-    tactile_symbol = "<|tactile|>"
     action_symbol = "<|action|>"
     action_fast_symbol = "<|action_fast|>"
 
@@ -514,10 +508,7 @@ def get_wallx_normal_text(
     else:
         # Generate actions
         instruction = get_task_instruction(frame_instruction_info, priority_order=priority_order)
-        tactile_prompt = ""
-        if n_tactile_tokens > 0:
-            tactile_prompt = f"\nTactile: {tactile_symbol * n_tactile_tokens}"
-        text_prompt = f"\nPredict the next action in robot action.\nProprioception: {propri_symbol}{tactile_prompt}\n"
+        text_prompt = f"\nPredict the next action in robot action.\nProprioception: {propri_symbol}\n"
         user_message = f"{user_request} {instruction}{text_prompt}{role_end_symbol}\n"
         assistant_output = f"{role_start_symbol}assistant\n{action_fast_symbol}{role_end_symbol}\n{action_symbol * action_chunk_size}"
 

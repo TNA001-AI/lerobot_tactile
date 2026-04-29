@@ -21,7 +21,7 @@ from lerobot.optim.schedulers import (
     CosineDecayWithWarmupSchedulerConfig,
 )
 from lerobot.policies.rtc.configuration_rtc import RTCConfig
-from lerobot.utils.constants import OBS_IMAGES, OBS_TACTILE
+from lerobot.utils.constants import OBS_IMAGES
 
 
 @PreTrainedConfig.register_subclass("smolvla")
@@ -31,6 +31,9 @@ class SmolVLAConfig(PreTrainedConfig):
     n_obs_steps: int = 1
     chunk_size: int = 50
     n_action_steps: int = 50
+    # Frame stride for subsampling dataset frames. Set to 3 to train at 10Hz on 30Hz data.
+    frame_stride: int = 1
+    drop_n_last_frames: int = 0  # (chunk_size - n_action_steps) * frame_stride
 
     normalization_mapping: dict[str, NormalizationMode] = field(
         default_factory=lambda: {
@@ -126,6 +129,9 @@ class SmolVLAConfig(PreTrainedConfig):
     def __post_init__(self):
         super().__post_init__()
 
+        # Update drop_n_last_frames to account for frame_stride.
+        self.drop_n_last_frames = (self.chunk_size - self.n_action_steps) * self.frame_stride
+
         """Input validation (not exhaustive)."""
         if self.n_action_steps > self.chunk_size:
             raise ValueError(
@@ -174,7 +180,7 @@ class SmolVLAConfig(PreTrainedConfig):
 
     @property
     def action_delta_indices(self) -> list:
-        return list(range(self.chunk_size))
+        return [i * self.frame_stride for i in range(self.chunk_size)]
 
     @property
     def reward_delta_indices(self) -> None:
