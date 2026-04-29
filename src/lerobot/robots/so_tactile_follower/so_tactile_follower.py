@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import logging
+import warnings
 from typing import Any
 
 import numpy as np
@@ -67,11 +68,21 @@ class SOTactileFollower(SOFollower):
             try:
                 data = sensor.get_latest_data()
                 if data is None:
-                    logging.warning(f"Failed to read tactile sensor '{name}', using zeros")
+                    warnings.warn(
+                        f"Tactile sensor '{name}' returned no data; substituting zeros. "
+                        "Recorded frames will contain zero tactile signal until reads recover.",
+                        RuntimeWarning,
+                        stacklevel=2,
+                    )
                     data = np.zeros(sensor_cfg.shape, dtype=np.float32)
                 observation[obs_key] = data
             except Exception as e:
-                logging.error(f"Error reading tactile sensor '{name}': {e}")
+                warnings.warn(
+                    f"Tactile sensor '{name}' read raised {type(e).__name__}: {e}. "
+                    "Substituting zeros; recorded frames will contain zero tactile signal until reads recover.",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
                 observation[obs_key] = np.zeros(sensor_cfg.shape, dtype=np.float32)
 
         return observation
@@ -101,7 +112,7 @@ class SOTactileFollower(SOFollower):
         features = super().observation_features
 
         for name, sensor_cfg in self.config.tactile_sensors.items():
-            features[f"tactile.{name}"] = PolicyFeature(
+            features[f"{OBS_TACTILE}.{name}"] = PolicyFeature(
                 type=FeatureType.TACTILE,
                 shape=sensor_cfg.shape,
             )

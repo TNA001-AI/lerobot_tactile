@@ -13,7 +13,8 @@ import logging
 import multiprocessing as mp
 import threading
 import time
-from types import Self, TracebackType
+from types import TracebackType
+from typing import Self
 
 import cv2
 import numpy as np

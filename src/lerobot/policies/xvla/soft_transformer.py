@@ -30,7 +30,7 @@ import torch.nn.functional as functional
 
 def _to_2tuple(x) -> tuple:
     """Minimal replacement for timm.layers.to_2tuple."""
-    if isinstance(x, Iterable) and not isinstance(x, (str, bytes)):
+    if isinstance(x, Iterable) and not isinstance(x, str | bytes):
         t = tuple(x)
         return (t[0], t[1]) if len(t) >= 2 else (t[0], t[0])
     return (x, x)

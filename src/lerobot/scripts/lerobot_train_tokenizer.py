@@ -479,7 +479,7 @@ def train_tokenizer(cfg: TokenizerTrainingConfig):
         # extract stats for encoded dimensions only
         encoded_stats = {}
         for stat_name, stat_values in action_stats.items():
-            if isinstance(stat_values, (list, np.ndarray)):
+            if isinstance(stat_values, list | np.ndarray):
                 stat_array = np.array(stat_values)
                 if len(stat_array) > max(encoded_dim_indices):
                     encoded_stats[stat_name] = stat_array[encoded_dim_indices]

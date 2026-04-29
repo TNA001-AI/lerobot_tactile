@@ -272,7 +272,7 @@ class RABCWeights:
         for key in ["action", "index"]:
             if key in batch:
                 val = batch[key]
-                if isinstance(val, (torch.Tensor, np.ndarray)):
+                if isinstance(val, torch.Tensor | np.ndarray):
                     return val.shape[0]
         return 1
 
