@@ -28,7 +28,7 @@ class TactileSensorConfig:
     Example (dual sensor in robot config)::
 
         tactile_sensors = {
-            "left":  TactileSensorConfig(port="/dev/ttyUSB0"),
+            "left": TactileSensorConfig(port="/dev/ttyUSB0"),
             "right": TactileSensorConfig(port="/dev/ttyUSB1"),
         }
     """

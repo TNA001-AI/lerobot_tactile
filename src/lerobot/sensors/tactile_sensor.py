@@ -11,6 +11,7 @@
 
 import logging
 import multiprocessing as mp
+import queue
 import threading
 import time
 from types import TracebackType
@@ -21,7 +22,7 @@ import numpy as np
 from flexitac import FlexiTacSensor
 
 
-def _visualization_worker(queue: mp.Queue, window_name: str, shape: tuple[int, int]) -> None:
+def _visualization_worker(frame_queue: mp.Queue, window_name: str, shape: tuple[int, int]) -> None:
     """Subprocess entry point: receives colormap frames and displays via OpenCV."""
     window_width = shape[1] * 60
     window_height = shape[0] * 60
@@ -29,8 +30,8 @@ def _visualization_worker(queue: mp.Queue, window_name: str, shape: tuple[int, i
     cv2.resizeWindow(window_name, window_width, window_height)
     while True:
         try:
-            frame = queue.get(timeout=1.0)
-        except Exception:
+            frame = frame_queue.get(timeout=1.0)
+        except queue.Empty:
             continue
         if frame is None:
             break
@@ -244,8 +245,8 @@ class TactileSensor:
         if self._viz_queue is not None:
             try:
                 self._viz_queue.put_nowait(colormap)
-            except Exception:
-                pass
+            except queue.Full:
+                return False
         return True
 
     def close_visualization(self) -> None:
@@ -253,8 +254,8 @@ class TactileSensor:
             if self._viz_queue is not None:
                 try:
                     self._viz_queue.put_nowait(None)
-                except Exception:
-                    pass
+                except queue.Full:
+                    logging.debug("Visualization queue full while sending shutdown sentinel")
             if self._viz_process is not None and self._viz_process.is_alive():
                 self._viz_process.join(timeout=2.0)
                 if self._viz_process.is_alive():
@@ -267,5 +268,7 @@ class TactileSensor:
     def __enter__(self) -> Self:
         return self
 
-    def __exit__(self, exc_type: type | None, exc_val: Exception | None, exc_tb: TracebackType | None) -> None:
+    def __exit__(
+        self, exc_type: type | None, exc_val: Exception | None, exc_tb: TracebackType | None
+    ) -> None:
         self.disconnect()
