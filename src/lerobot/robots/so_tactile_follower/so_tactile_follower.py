@@ -45,6 +45,10 @@ class SOTactileFollower(SOFollower):
                     baud_rate=sensor_cfg.baud_rate,
                     shape=sensor_cfg.shape,
                     baseline=sensor_cfg.baseline,
+                    init_frames=sensor_cfg.init_frames,
+                    threshold=sensor_cfg.threshold,
+                    noise_scale=sensor_cfg.noise_scale,
+                    temporal_alpha=sensor_cfg.temporal_alpha,
                     enable_visualization=sensor_cfg.enable_visualization,
                 )
                 self._tactile_sensors[name] = sensor
