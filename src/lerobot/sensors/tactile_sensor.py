@@ -7,27 +7,22 @@
 # You may obtain a copy of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-"""Tactile sensor interface for LeRobot"""
+"""Tactile sensor interface for LeRobot (wraps the flexitac package)."""
 
-import contextlib
 import logging
 import multiprocessing as mp
+import queue
 import threading
 import time
-from queue import Empty, Full
+from types import TracebackType
+from typing import Self
 
 import cv2
 import numpy as np
-import serial
+from flexitac import FlexiTacSensor
 
 
-def _visualization_worker(queue: mp.Queue, window_name: str, shape: tuple):
+def _visualization_worker(frame_queue: mp.Queue, window_name: str, shape: tuple[int, int]) -> None:
     """Subprocess entry point: receives colormap frames and displays via OpenCV."""
     window_width = shape[1] * 60
     window_height = shape[0] * 60
@@ -35,8 +30,8 @@ def _visualization_worker(queue: mp.Queue, window_name: str, shape: tuple):
     cv2.resizeWindow(window_name, window_width, window_height)
     while True:
         try:
-            frame = queue.get(timeout=1.0)
-        except Empty:
+            frame = frame_queue.get(timeout=1.0)
+        except queue.Empty:
             continue
         if frame is None:
             break
@@ -46,54 +41,53 @@ def _visualization_worker(queue: mp.Queue, window_name: str, shape: tuple):
 
 
 class TactileSensor:
-    """Interface for 12x32 tactile sensor array via USB serial communication"""
-
-    # Binary protocol constants
-    MAGIC = b"\xaa\x55"
-    ROWS, COLS = 12, 32
-    FRAME_BYTES = ROWS * COLS  # 384
+    """LeRobot wrapper around ``flexitac.FlexiTacSensor`` with threading + cv2 viz."""
 
     def __init__(
         self,
         port: str = "/dev/ttyUSB0",
-        baud_rate: int = 2000000,
-        timeout: float = 0.01,
+        baud_rate: int = 2_000_000,
         shape: tuple[int, int] = (12, 32),
-        auto_calibrate: bool = True,
+        baseline: float | None = None,
+        init_frames: int = 30,
         enable_visualization: bool = True,
         window_name: str = "Tactile Sensor",
         threshold: float = 25.0,
         noise_scale: float = 30.0,
         temporal_alpha: float = 0.2,
-    ):
-        """
-        Initialize tactile sensor interface
+    ) -> None:
+        """Initialize tactile sensor.
 
         Args:
-            port: USB serial port for sensor communication
-            baud_rate: Serial communication baud rate
-            timeout: Serial communication timeout in seconds
-            shape: Expected tactile array shape (height, width)
-            auto_calibrate: Whether to automatically calibrate sensor on initialization
-            enable_visualization: Whether to enable real-time visualization
-            window_name: Name of the visualization window
-            threshold: Threshold for contact detection
-            noise_scale: Scale factor for normalizing low-pressure readings
-            temporal_alpha: Blending factor for temporal smoothing (0-1)
+            port: USB serial port.
+            baud_rate: Serial baud rate (matches flashed firmware).
+            shape: (rows, cols) of the tactile grid.
+            baseline: If set, skips the calibration phase on startup. The scalar
+                (e.g. ``20.0``) is applied to every pixel as a fixed baseline.
+                Leave as ``None`` to auto-calibrate on first read.
+            init_frames: Number of frames collected during auto-calibration.
+            enable_visualization: Launch cv2 viz subprocess on startup.
+            window_name: Viz window title.
+            threshold: Contact-detection threshold (ADC counts above baseline).
+            noise_scale: Divisor used to normalize sub-threshold readings.
+            temporal_alpha: EMA blending factor for smoothing the viz (0-1).
         """
         self.port = port
         self.baud_rate = baud_rate
-        self.timeout = timeout
         self.shape = shape
+        self.rows, self.cols = shape
 
-        self.serial_conn: serial.Serial | None = None
-        self.baseline: np.ndarray | None = None
+        self._sensor = FlexiTacSensor(
+            port,
+            rows=self.rows,
+            cols=self.cols,
+            baud=baud_rate,
+            threshold=threshold,
+            noise_scale=noise_scale,
+            init_frames=init_frames,
+            baseline=baseline,
+        )
         self.is_connected = False
-        self.is_calibrated = False
-
-        # Binary protocol buffers
-        self._ring_buffer = bytearray()
-        self._frame_buffer = bytearray(self.FRAME_BYTES)
 
         # Threading for continuous data collection
         self._stop_event = threading.Event()
@@ -104,348 +98,164 @@ class TactileSensor:
         # Visualization settings
         self.enable_visualization = enable_visualization
         self.window_name = window_name
-        self.threshold = threshold
-        self.noise_scale = noise_scale
         self.temporal_alpha = temporal_alpha
         self._prev_frame: np.ndarray | None = None
         self._viz_queue: mp.Queue | None = None
         self._viz_process: mp.Process | None = None
         self._visualization_initialized = False
 
-        # Connect and calibrate
         self.connect()
-        if auto_calibrate:
-            self.calibrate()
-
-        # Initialize visualization if enabled
         if self.enable_visualization:
             self._init_visualization()
 
-    def connect(self) -> bool:
-        """Connect to tactile sensor"""
-        try:
-            self.serial_conn = serial.Serial(
-                port=self.port,
-                baudrate=self.baud_rate,
-                timeout=self.timeout,
-                bytesize=serial.EIGHTBITS,
-                parity=serial.PARITY_NONE,
-                stopbits=serial.STOPBITS_ONE,
-                xonxoff=False,
-                rtscts=False,
-                dsrdtr=False,
-            )
+    @property
+    def baseline(self) -> np.ndarray | None:
+        return self._sensor.baseline
 
-            # Clear any existing data in buffer
-            self.serial_conn.flush()
-            self.serial_conn.reset_input_buffer()
+    @property
+    def is_calibrated(self) -> bool:
+        return self._sensor.baseline is not None
 
-            self.is_connected = True
-            logging.info(f"Connected to tactile sensor on {self.port}")
-            return True
+    def wait_for_calibration(self, timeout_s: float = 30.0, poll_s: float = 0.1) -> bool:
+        """Block until baseline is set or ``timeout_s`` elapses.
 
-        except serial.SerialException as e:
-            logging.error(f"Failed to connect to tactile sensor on {self.port}: {e}")
-            self.is_connected = False
-            return False
-        except Exception as e:
-            logging.error(f"Unexpected error connecting to tactile sensor: {e}")
-            self.is_connected = False
-            return False
-
-    def disconnect(self):
-        """Disconnect from tactile sensor"""
-        self.stop_continuous_read()
-        self.close_visualization()
-
-        if self.serial_conn and self.serial_conn.is_open:
-            self.serial_conn.close()
-            self.is_connected = False
-            logging.info("Disconnected from tactile sensor")
-
-    def _read_exact(self, n: int) -> bytearray | None:
-        """Read exactly n bytes from serial (blocking up to timeout loops)."""
-        buf = bytearray(n)
-        mv = memoryview(buf)
-        got = 0
-        max_retries = 100
-        retries = 0
-
-        while got < n and retries < max_retries:
-            r = self.serial_conn.readinto(mv[got:])
-            if r is None:
-                r = 0
-            if r == 0:
-                retries += 1
-                time.sleep(0.001)
-                continue
-            got += r
-            retries = 0
-
-        if got < n:
-            return None
-        return buf
-
-    def read_raw_data(self) -> np.ndarray | None:
-        """Read raw data from sensor (binary format with magic header 0xAA 0x55)"""
-        if not self.is_connected or not self.serial_conn:
-            logging.warning("Sensor not connected")
-            return None
-
-        try:
-            # Drain the OS serial buffer so _ring_buffer reflects everything
-            # that has arrived up to now, not just one 8192-byte chunk.
-            if self.serial_conn.in_waiting:
-                self._ring_buffer.extend(self.serial_conn.read(self.serial_conn.in_waiting))
-
-            # Read chunks and search for magic header
-            while True:
-                # Read available data
-                chunk = self.serial_conn.read(8192)
-                if chunk:
-                    self._ring_buffer.extend(chunk)
-
-                # Keep buffer bounded
-                if len(self._ring_buffer) > 50000:
-                    self._ring_buffer = self._ring_buffer[-50000:]
-
-                # Try to parse all available frames in buffer
-                # Search for magic header
-                idx = self._ring_buffer.find(self.MAGIC)
-                if idx < 0:
-                    # Keep last byte in case marker splits across chunks
-                    if len(self._ring_buffer) > 1:
-                        self._ring_buffer = self._ring_buffer[-1:]
-                    continue
-
-                # Drop bytes before marker
-                if idx > 0:
-                    del self._ring_buffer[:idx]
-
-                # Need at least magic header + frame data
-                if len(self._ring_buffer) < 2 + self.FRAME_BYTES:
-                    continue
-
-                # Consume magic header
-                del self._ring_buffer[:2]
-
-                # Extract frame bytes (may need to read more if not enough in buffer)
-                if len(self._ring_buffer) >= self.FRAME_BYTES:
-                    self._frame_buffer[:] = self._ring_buffer[: self.FRAME_BYTES]
-                    del self._ring_buffer[: self.FRAME_BYTES]
-                else:
-                    # Partial frame in buffer - need to read remaining bytes
-                    have = len(self._ring_buffer)
-                    self._frame_buffer[:have] = self._ring_buffer[:have]
-                    del self._ring_buffer[:have]
-                    rem = self.FRAME_BYTES - have
-                    rest = self._read_exact(rem)
-                    if rest is None:
-                        self._ring_buffer.clear()
-                        continue
-                    self._frame_buffer[have:] = rest
-
-                # Convert to numpy array
-                frame = (
-                    np.frombuffer(self._frame_buffer, dtype=np.uint8)
-                    .reshape((self.ROWS, self.COLS))
-                    .astype(np.float32)
-                )
-
-                # Drain any remaining complete frames in the ring buffer so we
-                # always return the LATEST frame, not the oldest one queued up.
-                while True:
-                    idx2 = self._ring_buffer.find(self.MAGIC)
-                    if idx2 < 0 or idx2 + 2 + self.FRAME_BYTES > len(self._ring_buffer):
-                        break
-                    del self._ring_buffer[: idx2 + 2]
-                    self._frame_buffer[:] = self._ring_buffer[: self.FRAME_BYTES]
-                    del self._ring_buffer[: self.FRAME_BYTES]
-                    frame = (
-                        np.frombuffer(self._frame_buffer, dtype=np.uint8)
-                        .reshape((self.ROWS, self.COLS))
-                        .astype(np.float32)
-                    )
-
-                return frame
-
-        except serial.SerialException as e:
-            logging.warning(f"Serial error: {e}")
-            return None
-        except Exception as e:
-            logging.error(f"Unexpected error reading sensor data: {e}")
-            return None
-
-    def calibrate(self, num_samples: int = 30) -> bool:
-        """Calibrate sensor by taking baseline reading using median"""
-        if not self.is_connected:
-            logging.error("Cannot calibrate: sensor not connected")
-            return False
-
-        logging.info(f"Calibrating tactile sensor with {num_samples} samples...")
-
-        samples = []
-        for i in range(num_samples):
-            data = self.read_raw_data()
-            if data is not None:
-                samples.append(data)
-            else:
-                logging.warning(f"Failed to read calibration sample {i + 1}/{num_samples}")
-
-            # Small delay between samples
-            time.sleep(0.01)
-
-        if len(samples) < num_samples * 0.5:  # Require at least 50% success rate
-            logging.error(f"Calibration failed: only {len(samples)}/{num_samples} valid samples")
-            return False
-
-        # Compute baseline as median of samples (more robust to outliers)
-        self.baseline = np.median(samples, axis=0).astype(np.float32)
-        self.is_calibrated = True
-
-        logging.info("Tactile sensor calibration completed")
+        Useful when auto-calibration runs in the background continuous-read
+        thread and a caller (e.g. dataset recorder) needs the baseline to be
+        present before proceeding. Returns True if calibrated, False on timeout.
+        """
+        deadline = time.monotonic() + timeout_s
+        while self._sensor.baseline is None:
+            if time.monotonic() >= deadline:
+                return False
+            time.sleep(poll_s)
         return True
 
+    def metadata(self) -> dict:
+        """Return a JSON-serializable snapshot of sensor config + current baseline.
+
+        Intended for embedding in dataset metadata (e.g. ``info.json``) so the
+        normalization regime that produced recorded frames is reproducible.
+        """
+        baseline = self._sensor.baseline
+        return {
+            "port": self.port,
+            "baud_rate": self.baud_rate,
+            "rows": self.rows,
+            "cols": self.cols,
+            "threshold": float(self._sensor.threshold),
+            "noise_scale": float(self._sensor.noise_scale),
+            "init_frames": int(self._sensor.init_frames),
+            "is_calibrated": baseline is not None,
+            "baseline": baseline.tolist() if baseline is not None else None,
+        }
+
+    def connect(self) -> None:
+        self._sensor.open()
+        self.is_connected = True
+        logging.info(f"Connected to tactile sensor on {self.port}")
+
+    def disconnect(self) -> None:
+        self.stop_continuous_read()
+        self.close_visualization()
+        self._sensor.close()
+        self.is_connected = False
+        logging.info("Disconnected from tactile sensor")
+
+    def calibrate(self, num_samples: int = 30) -> bool:
+        try:
+            self._sensor.calibrate(n=num_samples)
+            logging.info("Tactile sensor calibration completed")
+            return True
+        except Exception as e:
+            logging.error(f"Calibration failed: {e}")
+            return False
+
     def read_data(self) -> np.ndarray | None:
-        """Read processed tactile data (raw - baseline - threshold)"""
-        raw_data = self.read_raw_data()
-        if raw_data is None:
+        """Read normalized tactile data (0-1 range) from the sensor."""
+        try:
+            frame = self._sensor.read_latest()
+            return frame.normalized
+        except Exception as e:
+            logging.warning(f"Read error: {e}")
             return None
 
-        if not self.is_calibrated or self.baseline is None:
-            logging.warning("Sensor not calibrated, returning raw data")
-            return raw_data.astype(np.float32)
-
-        processed_data = raw_data.astype(np.float32) - self.baseline - self.threshold
-        processed_data = np.clip(processed_data, 0, 100)
-
-        return processed_data
-
-    def start_continuous_read(self):
-        """Start continuous data reading in background thread"""
+    def start_continuous_read(self) -> None:
         if self._data_thread and self._data_thread.is_alive():
             logging.warning("Continuous reading already started")
             return
-
         self._stop_event.clear()
-        self._data_thread = threading.Thread(target=self._continuous_read_loop)
-        self._data_thread.daemon = True
+        self._data_thread = threading.Thread(target=self._continuous_read_loop, daemon=True)
         self._data_thread.start()
-
         logging.info("Started continuous tactile data reading")
 
-    def stop_continuous_read(self):
-        """Stop continuous data reading"""
+    def stop_continuous_read(self) -> None:
         if self._data_thread and self._data_thread.is_alive():
             self._stop_event.set()
             self._data_thread.join(timeout=1.0)
             logging.info("Stopped continuous tactile data reading")
 
-    def _continuous_read_loop(self):
-        """Background loop for continuous data reading and visualization"""
+    def _continuous_read_loop(self) -> None:
         while not self._stop_event.is_set():
             data = self.read_data()
             if data is not None:
                 with self._data_lock:
                     self._latest_data = data.copy()
                 self.update_visualization(data)
+            else:
+                time.sleep(0.01)
 
     def get_latest_data(self) -> np.ndarray | None:
-        """Get latest data from continuous reading"""
         with self._data_lock:
             return self._latest_data.copy() if self._latest_data is not None else None
 
-    def _init_visualization(self):
-        """Launch a subprocess to display the tactile visualization window."""
+    def _init_visualization(self) -> None:
         self._viz_queue = mp.Queue(maxsize=2)
+        display_shape = (self.rows, self.cols)
         self._viz_process = mp.Process(
             target=_visualization_worker,
-            args=(self._viz_queue, self.window_name, self.shape),
+            args=(self._viz_queue, self.window_name, display_shape),
             daemon=True,
         )
         self._viz_process.start()
-        self._prev_frame = np.zeros(self.shape, dtype=np.float32)
+        self._prev_frame = np.zeros(display_shape, dtype=np.float32)
         self._visualization_initialized = True
         logging.info(f"Visualization process started for '{self.window_name}'")
 
     def _temporal_filter(self, new_frame: np.ndarray) -> np.ndarray:
-        """
-        Apply temporal smoothing filter.
-
-        Args:
-            new_frame: Current frame data
-
-        Returns:
-            Temporally smoothed frame
-        """
         if self._prev_frame is None:
             self._prev_frame = np.zeros_like(new_frame)
         filtered = self.temporal_alpha * new_frame + (1 - self.temporal_alpha) * self._prev_frame
         self._prev_frame = filtered.copy()
         return filtered
 
-    def _normalize_data(self, data: np.ndarray) -> np.ndarray:
-        """
-        Normalize tactile data for visualization.
-
-        Args:
-            data: Processed tactile data (already baseline and threshold subtracted)
-
-        Returns:
-            Normalized data in range [0, 1]
-        """
-        max_val = np.max(data)
-        normalized = data / self.noise_scale if max_val < self.threshold else data / (max_val + 1e-6)
-        return np.clip(normalized, 0, 1)
-
     def update_visualization(self, data: np.ndarray | None = None) -> bool:
-        """
-        Update the visualization with current tactile data.
-
-        Args:
-            data: Tactile data to visualize. If None, uses latest data from continuous reading.
-
-        Returns:
-            True if visualization was updated successfully
-        """
         if not self.enable_visualization:
             return False
-
         if not self._visualization_initialized:
             self._init_visualization()
-
-        # Get data if not provided
         if data is None:
             data = self.get_latest_data()
-
         if data is None:
             return False
 
-        # Normalize the data
-        normalized = self._normalize_data(data)
-
-        # Apply temporal filtering
-        filtered = self._temporal_filter(normalized)
-
-        # Scale to 0-255 and convert to uint8
+        filtered = self._temporal_filter(data)
         scaled = (filtered * 255).astype(np.uint8)
-
-        # Apply color map
         colormap = cv2.applyColorMap(scaled, cv2.COLORMAP_VIRIDIS)
 
-        # Send to visualization subprocess (non-blocking; drop frame if process is busy)
         if self._viz_queue is not None:
-            with contextlib.suppress(Full):
+            try:
                 self._viz_queue.put_nowait(colormap)
-
+            except queue.Full:
+                return False
         return True
 
-    def close_visualization(self):
-        """Stop the visualization subprocess."""
+    def close_visualization(self) -> None:
         if self._visualization_initialized:
             if self._viz_queue is not None:
-                with contextlib.suppress(Full):
-                    self._viz_queue.put_nowait(None)  # sentinel to stop worker
+                try:
+                    self._viz_queue.put_nowait(None)
+                except queue.Full:
+                    logging.debug("Visualization queue full while sending shutdown sentinel")
             if self._viz_process is not None and self._viz_process.is_alive():
                 self._viz_process.join(timeout=2.0)
                 if self._viz_process.is_alive():
@@ -455,13 +265,10 @@ class TactileSensor:
             self._visualization_initialized = False
             logging.info(f"Visualization process for '{self.window_name}' stopped")
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self, exc_type: type | None, exc_val: Exception | None, exc_tb: TracebackType | None
+    ) -> None:
         self.disconnect()
-
-    def __del__(self):
-        """Cleanup on deletion"""
-        with contextlib.suppress(Exception):
-            self.disconnect()

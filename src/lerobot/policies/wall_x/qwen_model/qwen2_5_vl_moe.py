@@ -414,7 +414,7 @@ class Qwen2_5_VLPreTrainedModel(PreTrainedModel):
 
     def _init_weights(self, module):
         std = self.config.initializer_range
-        if isinstance(module, (nn.Linear, nn.Conv3d)):
+        if isinstance(module, nn.Linear | nn.Conv3d):
             module.weight.data.normal_(mean=0.0, std=std)
             if module.bias is not None:
                 module.bias.data.zero_()
