@@ -140,6 +140,8 @@ class RealSenseCamera(Camera):
 
         self.rotation: int | None = get_cv2_rotation(config.rotation)
 
+        self.capture_width: int | None = None
+        self.capture_height: int | None = None
         cfg_width, cfg_height = config.width, config.height
         if cfg_width and cfg_height:
             self.capture_width, self.capture_height = cfg_width, cfg_height
@@ -287,7 +289,11 @@ class RealSenseCamera(Camera):
         """Creates and configures the RealSense pipeline configuration object."""
         rs.config.enable_device(rs_config, self.serial_number)
 
-        if self.width and self.height and self.fps:
+        if self.config.width is not None and self.config.height is not None and self.config.fps is not None:
+            if self.capture_width is None or self.capture_height is None:
+                raise RuntimeError(
+                    f"{self}: explicit stream resolution requested but capture_width/capture_height unset."
+                )
             rs_config.enable_stream(
                 rs.stream.color, self.capture_width, self.capture_height, rs.format.rgb8, self.fps
             )
@@ -319,15 +325,27 @@ class RealSenseCamera(Camera):
         if self.fps is None:
             self.fps = stream.fps()
 
-        if self.width is None or self.height is None:
-            actual_width = int(round(stream.width()))
-            actual_height = int(round(stream.height()))
-            if self.rotation in [cv2.ROTATE_90_CLOCKWISE, cv2.ROTATE_90_COUNTERCLOCKWISE]:
+        actual_width = int(round(stream.width()))
+        actual_height = int(round(stream.height()))
+        self.capture_width, self.capture_height = actual_width, actual_height
+
+        # Use config for "use device default mode", not self.width/self.height (targets may
+        # already have set output size to e.g. 224×224 before the pipeline was started).
+        if self.config.width is None or self.config.height is None:
+            if self.target_width and self.target_height:
+                self.width = self.target_width
+                self.height = self.target_height
+            elif self.rotation in [cv2.ROTATE_90_CLOCKWISE, cv2.ROTATE_90_COUNTERCLOCKWISE]:
                 self.width, self.height = actual_height, actual_width
-                self.capture_width, self.capture_height = actual_width, actual_height
             else:
                 self.width, self.height = actual_width, actual_height
-                self.capture_width, self.capture_height = actual_width, actual_height
+        elif self.target_width and self.target_height:
+            self.width = self.target_width
+            self.height = self.target_height
+        elif self.rotation in [cv2.ROTATE_90_CLOCKWISE, cv2.ROTATE_90_COUNTERCLOCKWISE]:
+            self.width, self.height = actual_height, actual_width
+        else:
+            self.width, self.height = actual_width, actual_height
 
     @check_if_not_connected
     def read_depth(self, timeout_ms: int = 200) -> NDArray[Any]:
