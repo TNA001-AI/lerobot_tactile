@@ -140,10 +140,11 @@ class RealSenseCamera(Camera):
 
         self.rotation: int | None = get_cv2_rotation(config.rotation)
 
-        if self.height and self.width:
-            self.capture_width, self.capture_height = self.width, self.height
+        cfg_width, cfg_height = config.width, config.height
+        if cfg_width and cfg_height:
+            self.capture_width, self.capture_height = cfg_width, cfg_height
             if self.rotation in [cv2.ROTATE_90_CLOCKWISE, cv2.ROTATE_90_COUNTERCLOCKWISE]:
-                self.capture_width, self.capture_height = self.height, self.width
+                self.capture_width, self.capture_height = cfg_height, cfg_width
 
         # Target dimensions for software resizing
         self.target_width = config.target_width
