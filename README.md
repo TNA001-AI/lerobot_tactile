@@ -6,6 +6,10 @@ A fork of [LeRobot](https://github.com/huggingface/lerobot) that adds **tactile 
 
 The website is the primary reference for usage, hardware setup, data collection, and training recipes. This README only covers what you need to get the environment running.
 
+## Demo
+
+https://github.com/user-attachments/assets/5335e61f-08e4-48a0-aae2-5739038b5505
+
 ## Environment Setup
 
 You need two components: the LeRobot library (this repo) and the `pyflexitac` driver for the tactile sensor.
