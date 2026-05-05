@@ -2,7 +2,7 @@
 
 A fork of [LeRobot](https://github.com/huggingface/lerobot) that adds **tactile sensing** to robot policies. We integrate FlexiTac tactile sensors into the LeRobot stack — data collection, dataset format, and policy training/inference (ACT, Diffusion, Pi0.5, SmolVLA) — so policies can learn from touch in addition to vision and proprioception.
 
-🌐 **Project website (overview, demos, and full step-by-step guide):** https://tna001-ai.github.io/tactile-lerobot-website/index.html
+🌐 **Project website (overview, demos, and full step-by-step guide):** [https://tna001-ai.github.io/LeFlexiTac/docs.html](https://tna001-ai.github.io/LeFlexiTac/docs.html)
 
 The website is the primary reference for usage, hardware setup, data collection, and training recipes. This README only covers what you need to get the environment running.
 
@@ -65,17 +65,25 @@ Both imports should succeed and point into your local clones.
 
 ## Next Steps
 
-For data collection, training, and evaluation with tactile sensors, follow the guide on the [project website](https://tna001-ai.github.io/tactile-lerobot-website/index.html).
+For data collection, training, and evaluation with tactile sensors, follow the guide on the [project website](https://tna001-ai.github.io/LeFlexiTac/docs.html).
 
 ## Citation
 
-If you use this work, please cite both the upstream LeRobot project and the tactile extension (see the project website for the latest citation).
+If you use this work, please cite both the upstream LeRobot project and the tactile extension.
 
 ```bibtex
 @misc{cadene2024lerobot,
-    author = {Cadene, Remi and Alibert, Simon and Soare, Alexander and Gallouedec, Quentin and Zouitine, Adil and Palma, Steven and Kooijmans, Pepijn and Aractingi, Michel and Shukor, Mustafa and Aubakirova, Dana and Russi, Martino and Capuano, Francesco and Pascal, Caroline and Choghari, Jade and Moss, Jess and Wolf, Thomas},
-    title = {LeRobot: State-of-the-art Machine Learning for Real-World Robotics in Pytorch},
-    howpublished = "\url{https://github.com/huggingface/lerobot}",
-    year = {2024}
+  author = {Cadene, Remi and Alibert, Simon and Soare, Alexander and Gallouedec, Quentin and Zouitine, Adil and Palma, Steven and Kooijmans, Pepijn and Aractingi, Michel and Shukor, Mustafa and Aubakirova, Dana and Russi, Martino and Capuano, Francesco and Pascal, Caroline and Choghari, Jade and Moss, Jess and Wolf, Thomas},
+  title = {LeRobot: State-of-the-art Machine Learning for Real-World Robotics in Pytorch},
+  howpublished = "\url{https://github.com/huggingface/lerobot}",
+  year = {2024}
+}
+
+@article{tao2026leflexitac,
+  author = {Naian Tao and Yifan He and Wesley Maa and Binghao Huang and Yunzhu Li},
+  title = {{LeFlexiTac}: Giving Robots a Sense of Touch},
+  journal = {Columbia University RoboPIL Blog},
+  year = {2026},
+  note = {\url{https://tna001-ai.github.io/tactile-lerobot-website/}},
 }
 ```
