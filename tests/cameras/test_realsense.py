@@ -213,16 +213,20 @@ def test_read_latest_too_old():
     ids=["no_rot", "rot90", "rot180", "rot270"],
 )
 def test_rotation(rotation):
-    config = RealSenseCameraConfig(serial_number_or_name="042", rotation=rotation, warmup_s=0)
+    config = RealSenseCameraConfig(
+        serial_number_or_name="042",
+        rotation=rotation,
+        warmup_s=0,
+        target_width=None,
+        target_height=None,
+    )
     with RealSenseCamera(config) as camera:
         img = camera.read()
         assert isinstance(img, np.ndarray)
+        assert img.shape[:2] == (camera.height, camera.width)
 
+        cw, ch = camera.capture_width, camera.capture_height
         if rotation in (Cv2Rotation.ROTATE_90, Cv2Rotation.ROTATE_270):
-            assert camera.width == 480
-            assert camera.height == 640
-            assert img.shape[:2] == (640, 480)
+            assert (camera.width, camera.height) == (ch, cw)
         else:
-            assert camera.width == 640
-            assert camera.height == 480
-            assert img.shape[:2] == (480, 640)
+            assert (camera.width, camera.height) == (cw, ch)
