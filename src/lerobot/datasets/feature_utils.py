@@ -141,7 +141,10 @@ def hw_to_dataset_features(
 
     for key, pf in tactile_fts.items():
         dim_names = ["height", "width"] if len(pf.shape) == 2 else [f"dim_{i}" for i in range(len(pf.shape))]
-        features[f"{prefix}.{key}"] = {
+        # Keys may already include the dataset prefix (e.g. observation.tactile.primary from
+        # robots); do not prepend prefix again (would yield observation.observation.tactile.*).
+        feature_key = key if key.startswith(f"{prefix}.") else f"{prefix}.tactile.{key}"
+        features[feature_key] = {
             "dtype": "float32",
             "shape": pf.shape,
             "names": dim_names,

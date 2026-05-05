@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python  # noqa: D100
 
 # Copyright 2026 The HuggingFace Inc. team. All rights reserved.
 #
@@ -77,7 +77,7 @@ def tactile_follower():
         cfg = SOTactileFollowerConfig(
             port="/dev/null",
             tactile_sensors={
-                "primary": TactileSensorConfig(port="/dev/null", auto_calibrate=False),
+                "primary": TactileSensorConfig(port="/dev/null", baseline=20.0),
             },
         )
         robot = SOTactileFollower(cfg)

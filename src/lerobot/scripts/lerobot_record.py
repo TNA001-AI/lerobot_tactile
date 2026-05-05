@@ -85,6 +85,7 @@ from lerobot.configs import parser
 from lerobot.configs.policies import PreTrainedConfig
 from lerobot.datasets.feature_utils import build_dataset_frame, combine_feature_dicts
 from lerobot.datasets.image_writer import safe_stop_image_writer
+from lerobot.datasets.io_utils import write_info
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
 from lerobot.datasets.pipeline_features import aggregate_pipeline_dataset_features, create_initial_features
 from lerobot.datasets.video_utils import VideoEncodingManager
@@ -200,6 +201,10 @@ class DatasetRecordConfig:
     encoder_threads: int | None = None
     # Rename map for the observation to override the image and state keys
     rename_map: dict[str, str] = field(default_factory=dict)
+    # Max seconds to wait for tactile sensor auto-calibration to complete before
+    # writing sensor metadata into the dataset's info.json. Ignored for robots
+    # without tactile sensors.
+    tactile_calibration_timeout_s: float = 30.0
 
     def __post_init__(self):
         if self.single_task is None:
@@ -521,6 +526,21 @@ def record(cfg: RecordConfig) -> LeRobotDataset:
         robot.connect()
         if teleop is not None:
             teleop.connect()
+
+        if hasattr(robot, "tactile_sensor_metadata"):
+            timeout_s = cfg.dataset.tactile_calibration_timeout_s
+            if hasattr(robot, "wait_for_tactile_calibration"):
+                for name, calibrated in robot.wait_for_tactile_calibration(timeout_s=timeout_s).items():
+                    if not calibrated:
+                        logging.warning(
+                            f"Tactile sensor '{name}' not calibrated after "
+                            f"{timeout_s:.0f}s; writing metadata with baseline=null"
+                        )
+            tactile_meta = robot.tactile_sensor_metadata()
+            if tactile_meta:
+                dataset.meta.info["tactile_sensors"] = tactile_meta
+                write_info(dataset.meta.info, dataset.meta.root)
+                logging.info(f"Wrote tactile sensor metadata for {list(tactile_meta)} to info.json")
 
         listener, events = init_keyboard_listener()
 

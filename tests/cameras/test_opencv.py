@@ -284,7 +284,13 @@ def test_rotation(rotation, index_or_path):
     dimensions = filename.split("_")[-1].split(".")[0]  # Assumes filenames format (_wxh.png)
     original_width, original_height = map(int, dimensions.split("x"))
 
-    config = OpenCVCameraConfig(index_or_path=index_or_path, rotation=rotation, warmup_s=0)
+    config = OpenCVCameraConfig(
+        index_or_path=index_or_path,
+        rotation=rotation,
+        warmup_s=0,
+        target_width=None,
+        target_height=None,
+    )
     with OpenCVCamera(config) as camera:
         img = camera.read()
         assert isinstance(img, np.ndarray)

@@ -14,8 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import contextlib
 import logging
+import warnings
 from typing import Any
 
 import numpy as np
@@ -45,7 +45,11 @@ class SOTactileFollower(SOFollower):
                     port=sensor_cfg.port,
                     baud_rate=sensor_cfg.baud_rate,
                     shape=sensor_cfg.shape,
-                    auto_calibrate=sensor_cfg.auto_calibrate,
+                    baseline=sensor_cfg.baseline,
+                    init_frames=sensor_cfg.init_frames,
+                    threshold=sensor_cfg.threshold,
+                    noise_scale=sensor_cfg.noise_scale,
+                    temporal_alpha=sensor_cfg.temporal_alpha,
                     enable_visualization=sensor_cfg.enable_visualization,
                 )
                 self._tactile_sensors[name] = sensor
@@ -64,14 +68,43 @@ class SOTactileFollower(SOFollower):
             try:
                 data = sensor.get_latest_data()
                 if data is None:
-                    logging.warning(f"Failed to read tactile sensor '{name}', using zeros")
+                    warnings.warn(
+                        f"Tactile sensor '{name}' returned no data; substituting zeros. "
+                        "Recorded frames will contain zero tactile signal until reads recover.",
+                        RuntimeWarning,
+                        stacklevel=2,
+                    )
                     data = np.zeros(sensor_cfg.shape, dtype=np.float32)
                 observation[obs_key] = data
             except Exception as e:
-                logging.error(f"Error reading tactile sensor '{name}': {e}")
+                warnings.warn(
+                    f"Tactile sensor '{name}' read raised {type(e).__name__}: {e}. "
+                    "Substituting zeros; recorded frames will contain zero tactile signal until reads recover.",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
                 observation[obs_key] = np.zeros(sensor_cfg.shape, dtype=np.float32)
 
         return observation
+
+    def wait_for_tactile_calibration(self, timeout_s: float = 30.0) -> dict[str, bool]:
+        """Block until every tactile sensor reports a baseline, or ``timeout_s`` elapses.
+
+        Returns a ``{sensor_name: calibrated}`` dict so callers can log which
+        sensors timed out. The timeout applies to each sensor individually.
+        """
+        return {
+            name: sensor.wait_for_calibration(timeout_s=timeout_s)
+            for name, sensor in self._tactile_sensors.items()
+        }
+
+    def tactile_sensor_metadata(self) -> dict[str, dict]:
+        """Per-sensor config + calibration snapshot, keyed by sensor name.
+
+        Written into the dataset's ``info.json`` under ``tactile_sensors`` so the
+        normalization regime that produced recorded frames is recoverable.
+        """
+        return {name: sensor.metadata() for name, sensor in self._tactile_sensors.items()}
 
     @property
     def observation_features(self) -> dict[str, PolicyFeature]:
@@ -79,7 +112,7 @@ class SOTactileFollower(SOFollower):
         features = super().observation_features
 
         for name, sensor_cfg in self.config.tactile_sensors.items():
-            features[f"tactile.{name}"] = PolicyFeature(
+            features[f"{OBS_TACTILE}.{name}"] = PolicyFeature(
                 type=FeatureType.TACTILE,
                 shape=sensor_cfg.shape,
             )
@@ -96,7 +129,3 @@ class SOTactileFollower(SOFollower):
                 logging.error(f"Error disconnecting tactile sensor '{name}': {e}")
 
         super().disconnect()
-
-    def __del__(self):
-        with contextlib.suppress(Exception):
-            self.disconnect()

@@ -120,10 +120,13 @@ class OpenCVCamera(Camera):
         self.rotation: int | None = get_cv2_rotation(config.rotation)
         self.backend: int = config.backend
 
-        if self.height and self.width:
-            self.capture_width, self.capture_height = self.width, self.height
+        self.capture_width: int | None = None
+        self.capture_height: int | None = None
+        cfg_width, cfg_height = config.width, config.height
+        if cfg_width and cfg_height:
+            self.capture_width, self.capture_height = cfg_width, cfg_height
             if self.rotation in [cv2.ROTATE_90_CLOCKWISE, cv2.ROTATE_90_COUNTERCLOCKWISE]:
-                self.capture_width, self.capture_height = self.height, self.width
+                self.capture_width, self.capture_height = cfg_height, cfg_width
 
         # Target dimensions for software resizing
         self.target_width = config.target_width
@@ -217,13 +220,28 @@ class OpenCVCamera(Camera):
         default_width = int(round(self.videocapture.get(cv2.CAP_PROP_FRAME_WIDTH)))
         default_height = int(round(self.videocapture.get(cv2.CAP_PROP_FRAME_HEIGHT)))
 
-        if self.width is None or self.height is None:
-            self.width, self.height = default_width, default_height
+        # Use config (requested capture size), not self.width/self.height: targets may already
+        # have set output dimensions to e.g. 224×224 while capture_width is still unset.
+        if self.config.width is None or self.config.height is None:
             self.capture_width, self.capture_height = default_width, default_height
-            if self.rotation in [cv2.ROTATE_90_CLOCKWISE, cv2.ROTATE_90_COUNTERCLOCKWISE]:
-                self.width, self.height = default_height, default_width
-                self.capture_width, self.capture_height = default_width, default_height
+            if self.target_width and self.target_height:
+                self.width = self.target_width
+                self.height = self.target_height
+            else:
+                self.width, self.height = default_width, default_height
+                if self.rotation in [cv2.ROTATE_90_CLOCKWISE, cv2.ROTATE_90_COUNTERCLOCKWISE]:
+                    self.width, self.height = default_height, default_width
         else:
+            if self.capture_width is None or self.capture_height is None:
+                cfg_w, cfg_h = self.config.width, self.config.height
+                if not cfg_w or not cfg_h:
+                    raise ValueError(
+                        f"{self} invalid config: width and height must be positive integers, "
+                        f"got width={cfg_w}, height={cfg_h}."
+                    )
+                self.capture_width, self.capture_height = cfg_w, cfg_h
+                if self.rotation in [cv2.ROTATE_90_CLOCKWISE, cv2.ROTATE_90_COUNTERCLOCKWISE]:
+                    self.capture_width, self.capture_height = cfg_h, cfg_w
             self._validate_width_and_height()
 
         if self.fps is None:

@@ -1455,7 +1455,7 @@ class Florence2LanguagePreTrainedModel(PreTrainedModel):
             for name, _ in module.named_parameters():
                 if name == "bias":
                     nn.init.constant_(module.bias, 0)
-        elif isinstance(module, (nn.LayerNorm, nn.BatchNorm2d)):
+        elif isinstance(module, nn.LayerNorm | nn.BatchNorm2d):
             nn.init.constant_(module.weight, 1.0)
             nn.init.constant_(module.bias, 0)
 

@@ -6,6 +6,10 @@ A fork of [LeRobot](https://github.com/huggingface/lerobot) that adds **tactile 
 
 The website is the primary reference for usage, hardware setup, data collection, and training recipes. This README only covers what you need to get the environment running.
 
+## Demo
+
+https://github.com/user-attachments/assets/5335e61f-08e4-48a0-aae2-5739038b5505
+
 ## Environment Setup
 
 You need two components: the LeRobot library (this repo) and the `pyflexitac` driver for the tactile sensor.
@@ -37,12 +41,18 @@ The tactile sensors are driven by [PyFlexiTac](https://github.com/WT-MM/PyFlexiT
 
 ```bash
 # In the same `lerobot` env
+conda activate lerobot
+
+# From PyPI
+pip install flexitac
+
+# From source
 git clone https://github.com/WT-MM/PyFlexiTac.git
 cd PyFlexiTac
 pip install -e .
 ```
 
-Refer to the PyFlexiTac README for sensor wiring, permissions, and a quick connectivity test before running any LeRobot scripts.
+Refer to the PyFlexiTac README for sensor wiring, permissions, flashing, and a quick connectivity test before running any LeRobot scripts.
 
 ### Verify
 
