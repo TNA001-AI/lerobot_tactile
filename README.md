@@ -1,4 +1,4 @@
-# LeflexiTac
+# LeFlexiTac
 
 A fork of [LeRobot](https://github.com/huggingface/lerobot) that adds **tactile sensing** to robot policies. We integrate FlexiTac tactile sensors into the LeRobot stack — data collection, dataset format, and policy training/inference (ACT, Diffusion, Pi0.5, SmolVLA) — so policies can learn from touch in addition to vision and proprioception.
 

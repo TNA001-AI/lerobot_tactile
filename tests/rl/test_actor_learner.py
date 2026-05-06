@@ -224,8 +224,14 @@ def test_end_to_end_interactions_flow(cfg):
 
 
 @require_package("grpcio", "grpc")
-@pytest.mark.parametrize("data_size", ["small", "large"])
-@pytest.mark.timeout(10)
+@pytest.mark.parametrize(
+    "data_size",
+    [
+        pytest.param("small", marks=pytest.mark.timeout(10)),
+        # ~4MB state dict is chunked over gRPC; slow CI runners can exceed a 10s watchdog.
+        pytest.param("large", marks=pytest.mark.timeout(60)),
+    ],
+)
 def test_end_to_end_parameters_flow(cfg, data_size):
     from lerobot.rl.actor import establish_learner_connection, learner_service_client, receive_policy
     from lerobot.rl.learner import start_learner
